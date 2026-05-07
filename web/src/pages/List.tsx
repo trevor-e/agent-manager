@@ -1,0 +1,257 @@
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '../api';
+import { navigate } from '../App';
+import type { Session, RepoSummary } from '../types';
+
+const STATE_BADGES: Record<string, { label: string; cls: string }> = {
+  launching: { label: 'launching', cls: 'badge badge-launching' },
+  working: { label: 'working', cls: 'badge badge-working' },
+  waiting: { label: 'waiting', cls: 'badge badge-waiting' },
+  idle: { label: 'idle', cls: 'badge badge-idle' },
+  stale: { label: 'stale', cls: 'badge badge-stale' },
+  done: { label: 'done', cls: 'badge badge-done' },
+  archived: { label: 'archived', cls: 'badge badge-archived' },
+};
+
+const FILTER_CHIPS = [
+  { key: 'active', label: 'Active' },
+  { key: 'all', label: 'All' },
+  { key: 'done', label: 'Done' },
+];
+
+function ageStr(ms: number): string {
+  const d = Date.now() - ms;
+  if (d < 60_000) return `${Math.floor(d / 1000)}s ago`;
+  if (d < 3_600_000) return `${Math.floor(d / 60_000)}m ago`;
+  if (d < 86_400_000) return `${Math.floor(d / 3_600_000)}h ago`;
+  return `${Math.floor(d / 86_400_000)}d ago`;
+}
+
+export function ListPage() {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [repos, setRepos] = useState<RepoSummary[]>([]);
+  const [filter, setFilter] = useState<string>('active');
+  const [repoFilter, setRepoFilter] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [launchOpen, setLaunchOpen] = useState(false);
+
+  async function refresh() {
+    try {
+      const params: Record<string, string> = {};
+      if (filter !== 'active' && filter !== 'all') params.status = filter;
+      else if (filter === 'all') params.status = 'all';
+      const [sessionsResp, reposResp] = await Promise.all([
+        api.listSessions(params),
+        api.repos(),
+      ]);
+      setSessions(sessionsResp.sessions);
+      setRepos(reposResp.repos);
+      setErr(null);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refresh();
+    const t = setInterval(refresh, 3000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
+
+  const filtered = useMemo(() => {
+    let list = sessions;
+    if (repoFilter) list = list.filter(s => s.repo_name === repoFilter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(s =>
+        s.display_name.toLowerCase().includes(q) ||
+        s.repo_name.toLowerCase().includes(q) ||
+        (s.last_prompt ?? '').toLowerCase().includes(q)
+      );
+    }
+    return [...list].sort((a, b) => {
+      const aDone = a.user_status === 'active' ? 0 : 1;
+      const bDone = b.user_status === 'active' ? 0 : 1;
+      if (aDone !== bDone) return aDone - bDone;
+      return b.last_event_at - a.last_event_at;
+    });
+  }, [sessions, filter, search, repoFilter]);
+
+  async function markDone(s: Session) {
+    await api.patchSession(s.id, { user_status: s.user_status === 'done' ? 'active' : 'done' });
+    refresh();
+  }
+
+  async function resume(s: Session) {
+    await api.launch({ project_path: s.project_path, resume_id: s.id });
+  }
+
+  return (
+    <div className="list-page">
+      <div className="toolbar">
+        <div className="chips">
+          {FILTER_CHIPS.map(c => (
+            <button
+              key={c.key}
+              className={'chip ' + (filter === c.key ? 'chip-active' : '')}
+              onClick={() => setFilter(c.key)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <input
+          className="search"
+          placeholder="search title or prompt…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {repoFilter && (
+          <button className="chip chip-active" onClick={() => setRepoFilter(null)} title="clear repo filter">
+            repo: {repoFilter} ✕
+          </button>
+        )}
+        <div className="grow" />
+        <span className="muted">{filtered.length} sessions</span>
+        <button className="primary" onClick={() => setLaunchOpen(true)}>+ New session</button>
+      </div>
+
+      {loading && <div className="muted pad">loading…</div>}
+      {err && <div className="error pad">{err}</div>}
+
+      <ul className="sessions sessions-flat">
+        {filtered.map(s => {
+          const badge = STATE_BADGES[s.derived_state] ?? STATE_BADGES.idle;
+          const isDone = s.user_status === 'done';
+          return (
+            <li key={s.id} className="row">
+              <span className={badge.cls + ' state-badge'}>{badge.label}</span>
+              <button
+                className="repo-tag"
+                onClick={() => setRepoFilter(s.repo_name)}
+                title={`filter to ${s.repo_name} (${s.project_path})`}
+              >
+                {s.repo_name}
+              </button>
+              <a
+                className="row-name"
+                href={`/sessions/${s.id}`}
+                onClick={e => {
+                  e.preventDefault();
+                  navigate(`/sessions/${s.id}`);
+                }}
+              >
+                {s.display_name}
+              </a>
+              {s.pr_url && (
+                <a
+                  className="pr-link"
+                  href={s.pr_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  title={s.pr_repository ? `${s.pr_repository}#${s.pr_number}` : s.pr_url}
+                >
+                  PR #{s.pr_number}
+                </a>
+              )}
+              {s.git_branch && <span className="muted small">{s.git_branch}</span>}
+              <span className="grow" />
+              <div className="row-actions">
+                <button className="primary" onClick={() => resume(s)} title="Resume in Ghostty">
+                  Resume
+                </button>
+                <button className="ghost" onClick={() => markDone(s)} title={isDone ? 'Reopen this session' : 'Hide from active list'}>
+                  {isDone ? 'Reopen' : 'Mark done'}
+                </button>
+              </div>
+              <span className="muted small row-age">{ageStr(s.last_event_at)}</span>
+            </li>
+          );
+        })}
+      </ul>
+
+      {launchOpen && (
+        <LaunchModal
+          repos={repos}
+          onClose={() => setLaunchOpen(false)}
+          onLaunched={() => {
+            setLaunchOpen(false);
+            setTimeout(refresh, 400);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function LaunchModal({
+  repos,
+  onClose,
+  onLaunched,
+}: {
+  repos: RepoSummary[];
+  onClose: () => void;
+  onLaunched: () => void;
+}) {
+  const [projectPath, setProjectPath] = useState(repos[0]?.project_path ?? '');
+  const [title, setTitle] = useState('');
+  const [pending, setPending] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!projectPath.trim()) {
+      setErr('Pick or type a project path');
+      return;
+    }
+    setPending(true);
+    try {
+      await api.launch({ project_path: projectPath.trim(), title: title.trim() || undefined });
+      onLaunched();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <form className="modal" onClick={e => e.stopPropagation()} onSubmit={submit}>
+        <h3>Launch new session</h3>
+        <label>Project directory</label>
+        <input
+          autoFocus
+          list="repo-paths"
+          value={projectPath}
+          onChange={e => setProjectPath(e.target.value)}
+          placeholder="/Users/.../some-repo"
+        />
+        <datalist id="repo-paths">
+          {repos.map(r => (
+            <option key={r.project_path} value={r.project_path}>{r.repo_name}</option>
+          ))}
+        </datalist>
+        <label>Title (optional)</label>
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="e.g. fix flaky test"
+        />
+        {err && <div className="error">{err}</div>}
+        <div className="modal-actions">
+          <button type="button" className="ghost" onClick={onClose}>Cancel</button>
+          <button type="submit" className="primary" disabled={pending}>
+            {pending ? 'Launching…' : 'Launch'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
