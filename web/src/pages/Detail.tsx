@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
+import { Composer } from '../components/Composer';
+import { BubbleRow, eventsToBubbles } from '../components/Bubble';
 import type { Session, SessionEvent } from '../types';
 
 const STATE_LABELS: Record<string, string> = {
@@ -137,14 +139,16 @@ export function DetailPage({ id }: { id: string }) {
         </div>
       </div>
 
+      <Composer session={session} />
+
       <div className="detail-body">
         <section className="events">
-          <h3 className="muted small">Last {events.length} events (newest first)</h3>
-          <ol className="event-log">
-            {[...events].reverse().map((ev, i) => (
-              <EventRow key={i} ev={ev} />
+          <h3 className="muted small">Conversation history (newest first)</h3>
+          <div className="bubbles">
+            {[...eventsToBubbles(events)].reverse().map(b => (
+              <BubbleRow key={b.id} bubble={b} />
             ))}
-          </ol>
+          </div>
         </section>
         <aside className="side">
           <h3 className="muted small">Notes</h3>
@@ -163,41 +167,3 @@ export function DetailPage({ id }: { id: string }) {
   );
 }
 
-function EventRow({ ev }: { ev: SessionEvent }) {
-  const t = ev.type ?? 'unknown';
-  const ts = typeof ev.timestamp === 'string' ? ev.timestamp : null;
-  let body = '';
-  if (t === 'last-prompt' && typeof ev.lastPrompt === 'string') body = ev.lastPrompt;
-  else if (t === 'user' || t === 'assistant' || t === 'message') {
-    const msg = (ev as any).message;
-    if (msg && typeof msg === 'object') {
-      const content = msg.content;
-      if (typeof content === 'string') body = content;
-      else if (Array.isArray(content)) {
-        body = content
-          .map((c: any) => {
-            if (!c) return '';
-            if (c.type === 'text') return c.text ?? '';
-            if (c.type === 'tool_use') return `[tool: ${c.name}]`;
-            if (c.type === 'tool_result')
-              return `[tool result] ${typeof c.content === 'string' ? c.content : ''}`;
-            if (c.type === 'thinking') return c.thinking ? `(thinking)` : '';
-            return '';
-          })
-          .filter(Boolean)
-          .join(' ');
-      }
-    }
-  }
-  body = body.replace(/\s+/g, ' ').trim();
-  if (body.length > 600) body = body.slice(0, 600) + '…';
-  return (
-    <li className={`event event-${t}`}>
-      <header className="event-header">
-        <span className="event-type">{t}</span>
-        {ts && <span className="muted small">{new Date(ts).toLocaleTimeString()}</span>}
-        {body && <span className="event-body-inline">{body}</span>}
-      </header>
-    </li>
-  );
-}

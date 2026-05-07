@@ -8,13 +8,11 @@ const STATE_BADGES: Record<string, { label: string; cls: string }> = {
   working: { label: 'working', cls: 'badge badge-working' },
   waiting: { label: 'waiting', cls: 'badge badge-waiting' },
   idle: { label: 'idle', cls: 'badge badge-idle' },
-  stale: { label: 'stale', cls: 'badge badge-stale' },
   done: { label: 'done', cls: 'badge badge-done' },
   archived: { label: 'archived', cls: 'badge badge-archived' },
 };
 
 const FILTER_CHIPS = [
-  { key: 'active', label: 'Active' },
   { key: 'all', label: 'All' },
   { key: 'done', label: 'Done' },
 ];
@@ -30,7 +28,7 @@ function ageStr(ms: number): string {
 export function ListPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [repos, setRepos] = useState<RepoSummary[]>([]);
-  const [filter, setFilter] = useState<string>('active');
+  const [filter, setFilter] = useState<string>('all');
   const [repoFilter, setRepoFilter] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -39,9 +37,7 @@ export function ListPage() {
 
   async function refresh() {
     try {
-      const params: Record<string, string> = {};
-      if (filter !== 'active' && filter !== 'all') params.status = filter;
-      else if (filter === 'all') params.status = 'all';
+      const params: Record<string, string> = { status: filter };
       const [sessionsResp, reposResp] = await Promise.all([
         api.listSessions(params),
         api.repos(),

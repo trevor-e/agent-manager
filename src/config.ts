@@ -7,4 +7,6 @@ export const config = {
   dbPath: process.env.CM_DB_PATH ?? resolve(process.cwd(), 'data', 'claude-manager.db'),
   launcher: (process.env.CM_LAUNCHER ?? 'ghostty') as 'ghostty',
   scanIntervalMs: Number(process.env.CM_SCAN_INTERVAL_MS ?? 5000),
+  claudeBin: process.env.CM_CLAUDE_BIN ?? resolve(homedir(), '.local', 'bin', 'claude'),
+  agentIdleTimeoutMs: Number(process.env.CM_AGENT_IDLE_TIMEOUT_MS ?? 60_000),
 };

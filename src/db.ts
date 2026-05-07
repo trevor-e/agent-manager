@@ -55,17 +55,18 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_processes_cwd ON running_processes(cwd);
 `);
 
-function addColumnIfMissing(column: string, def: string) {
+function addColumnIfMissing(table: string, column: string, def: string) {
   try {
-    db.exec(`ALTER TABLE sessions ADD COLUMN ${column} ${def}`);
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${def}`);
   } catch (err) {
     if (!String(err).includes('duplicate column name')) throw err;
   }
 }
-addColumnIfMissing('pr_url', 'TEXT');
-addColumnIfMissing('pr_number', 'INTEGER');
-addColumnIfMissing('pr_repository', 'TEXT');
-addColumnIfMissing('pr_seen_at', 'INTEGER');
+addColumnIfMissing('sessions', 'pr_url', 'TEXT');
+addColumnIfMissing('sessions', 'pr_number', 'INTEGER');
+addColumnIfMissing('sessions', 'pr_repository', 'TEXT');
+addColumnIfMissing('sessions', 'pr_seen_at', 'INTEGER');
+addColumnIfMissing('running_processes', 'session_id', 'TEXT');
 
 const prevVersion = (db.prepare("SELECT value FROM schema_meta WHERE key = 'schema_version'").get() as
   | { value: string }
@@ -103,6 +104,7 @@ export type SessionRow = {
 export type ProcessRow = {
   pid: number;
   cwd: string;
+  session_id: string | null;
   started_at: number;
   observed_at: number;
 };
@@ -218,8 +220,8 @@ export function replaceRunningProcesses(rows: ProcessRow[]) {
   const tx = db.transaction((rows: ProcessRow[]) => {
     db.prepare('DELETE FROM running_processes').run();
     const ins = db.prepare(`
-      INSERT INTO running_processes (pid, cwd, started_at, observed_at)
-      VALUES (@pid, @cwd, @started_at, @observed_at)
+      INSERT INTO running_processes (pid, cwd, session_id, started_at, observed_at)
+      VALUES (@pid, @cwd, @session_id, @started_at, @observed_at)
     `);
     for (const r of rows) ins.run(r);
   });

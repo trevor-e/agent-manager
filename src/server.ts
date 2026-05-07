@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { config } from './config.ts';
 import { registerRoutes } from './api/routes.ts';
 import { startScanner, stopScanner } from './scanner/index.ts';
+import { agentManager } from './agent/manager.ts';
 
 const app = Fastify({ logger: false });
 
@@ -39,6 +40,7 @@ app.listen({ port: config.port, host: '127.0.0.1' }).then(() => {
 const shutdown = (sig: string) => {
   process.stdout.write(`\nreceived ${sig}, shutting down\n`);
   stopScanner();
+  agentManager.stopAll();
   app.close().finally(() => process.exit(0));
 };
 process.on('SIGINT', () => shutdown('SIGINT'));

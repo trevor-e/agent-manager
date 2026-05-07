@@ -3,7 +3,6 @@ export type DerivedState =
   | 'working'
   | 'waiting'
   | 'idle'
-  | 'stale'
   | 'done'
   | 'archived';
 
@@ -29,6 +28,7 @@ export type Session = {
   derived_state: DerivedState;
   display_name: string;
   is_running: boolean;
+  web_chat_locked: boolean;
 };
 
 export type RepoSummary = {

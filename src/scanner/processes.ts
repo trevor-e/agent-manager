@@ -36,6 +36,24 @@ async function getCwd(pid: number): Promise<string | null> {
   return null;
 }
 
+const JSONL_RE = /\/\.claude\/projects\/[^/]+\/([0-9a-f-]{32,})\.jsonl$/;
+
+async function getOpenSessionId(pid: number): Promise<string | null> {
+  try {
+    const { stdout } = await execFileP(LSOF_BIN, ['-p', String(pid), '-Fn'], {
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    for (const line of stdout.split('\n')) {
+      if (!line.startsWith('n')) continue;
+      const m = line.slice(1).match(JSONL_RE);
+      if (m) return m[1];
+    }
+  } catch {
+    // process may have exited
+  }
+  return null;
+}
+
 export async function scanProcesses(): Promise<ProcessRow[]> {
   let stdout = '';
   try {
@@ -62,10 +80,16 @@ export async function scanProcesses(): Promise<ProcessRow[]> {
   const now = Date.now();
   const results = await Promise.all(
     candidates.map(async ({ pid, etime }) => {
-      const cwd = await getCwd(pid);
+      const [cwd, sessionId] = await Promise.all([getCwd(pid), getOpenSessionId(pid)]);
       if (!cwd) return null;
       const startedAt = now - etimeToMs(etime);
-      return { pid, cwd, started_at: startedAt, observed_at: now } satisfies ProcessRow;
+      return {
+        pid,
+        cwd,
+        session_id: sessionId,
+        started_at: startedAt,
+        observed_at: now,
+      } satisfies ProcessRow;
     })
   );
   const rows = results.filter((r): r is ProcessRow => r !== null);

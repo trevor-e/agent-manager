@@ -34,4 +34,20 @@ export const api = {
     jsend<{ ok: boolean; session_id: string }>('/api/sessions/launch', 'POST', body),
   repos: () => jget<{ repos: RepoSummary[] }>('/api/repos'),
   scan: () => jsend<{ ok: boolean }>('/api/scan', 'POST'),
+
+  sendMessage: (id: string, content: string) =>
+    jsend<{ ok: boolean }>(`/api/sessions/${id}/messages`, 'POST', { content }),
+  resolveApproval: (
+    id: string,
+    approvalId: string,
+    decision: 'approve' | 'deny',
+    opts: { reason?: string; updatedInput?: unknown } = {}
+  ) =>
+    jsend<{ ok: boolean }>(`/api/sessions/${id}/approvals/${approvalId}`, 'POST', {
+      decision,
+      reason: opts.reason,
+      updatedInput: opts.updatedInput,
+    }),
+  interrupt: (id: string) => jsend<{ ok: boolean }>(`/api/sessions/${id}/interrupt`, 'POST'),
+  stopAgent: (id: string) => jsend<{ ok: boolean }>(`/api/sessions/${id}/stop`, 'POST'),
 };
