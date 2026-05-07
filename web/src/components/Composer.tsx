@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import type { Session } from '../types';
+import type { Session, SessionEvent } from '../types';
 import {
   type Bubble,
   type ToolUseBubble,
   type AssistantBubble,
   BubbleRow,
   ToolInputView,
+  eventsToBubbles,
 } from './Bubble';
 
 type AgentEvent =
@@ -19,8 +20,14 @@ type AgentEvent =
 
 type Approval = { approvalId: string; toolName: string; input: any };
 
-export function Composer({ session }: { session: Session }) {
-  const [bubbles, setBubbles] = useState<Bubble[]>([]);
+export function Composer({
+  session,
+  initialEvents,
+}: {
+  session: Session;
+  initialEvents: SessionEvent[];
+}) {
+  const [bubbles, setBubbles] = useState<Bubble[]>(() => eventsToBubbles(initialEvents));
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [connected, setConnected] = useState(false);
   const [draft, setDraft] = useState('');
@@ -31,10 +38,23 @@ export function Composer({ session }: { session: Session }) {
 
   const showCoexistWarning = session.is_running;
 
+  function nextLiveId(): string {
+    return `L${++bubbleIdCounter.current}`;
+  }
+
   function addBubble(b: Omit<Bubble, 'id'>): string {
-    const id = String(++bubbleIdCounter.current);
+    const id = nextLiveId();
     setBubbles(prev => [...prev, { ...(b as Bubble), id }]);
     return id;
+  }
+
+  function addToolUseIfNew(toolUse: Omit<ToolUseBubble, 'id'>) {
+    setBubbles(prev => {
+      if (prev.some(b => b.kind === 'tool_use' && b.toolUseId === toolUse.toolUseId)) {
+        return prev;
+      }
+      return [...prev, { ...toolUse, id: nextLiveId() }];
+    });
   }
 
   function setAssistantText(messageId: string, text: string) {
@@ -43,7 +63,7 @@ export function Composer({ session }: { session: Session }) {
       if (idx === -1) {
         return [
           ...prev,
-          { kind: 'assistant', id: String(++bubbleIdCounter.current), messageId, text },
+          { kind: 'assistant', id: nextLiveId(), messageId, text },
         ];
       }
       const cur = prev[idx] as AssistantBubble;
@@ -110,13 +130,13 @@ export function Composer({ session }: { session: Session }) {
             if (fullText) setAssistantText(messageId, fullText);
             for (const c of content) {
               if (c && c.type === 'tool_use') {
-                addBubble({
+                addToolUseIfNew({
                   kind: 'tool_use',
                   toolUseId: c.id,
                   toolName: c.name,
                   input: c.input,
                   status: 'pending',
-                } as Bubble);
+                });
               }
             }
           }
@@ -200,7 +220,7 @@ export function Composer({ session }: { session: Session }) {
     <div className="composer">
       <div className="composer-header">
         <h3 className="muted small">
-          Web chat {connected ? <span className="dot dot-on" title="connected" /> : <span className="dot dot-off" title="disconnected" />}
+          Conversation {connected ? <span className="dot dot-on" title="connected" /> : <span className="dot dot-off" title="disconnected" />}
         </h3>
         {showCoexistWarning && (
           <span

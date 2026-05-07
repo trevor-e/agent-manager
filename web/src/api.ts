@@ -30,7 +30,7 @@ export const api = {
   getSession: (id: string) => jget<{ session: Session; events: SessionEvent[] }>(`/api/sessions/${id}`),
   patchSession: (id: string, body: Partial<{ user_status: 'active' | 'done' | 'archived'; title: string | null; notes: string | null }>) =>
     jsend<{ session: Session }>(`/api/sessions/${id}`, 'PATCH', body),
-  launch: (body: { project_path: string; resume_id?: string; title?: string }) =>
+  launch: (body: { project_path: string; resume_id?: string; title?: string; web_only?: boolean }) =>
     jsend<{ ok: boolean; session_id: string }>('/api/sessions/launch', 'POST', body),
   repos: () => jget<{ repos: RepoSummary[] }>('/api/repos'),
   scan: () => jsend<{ ok: boolean }>('/api/scan', 'POST'),

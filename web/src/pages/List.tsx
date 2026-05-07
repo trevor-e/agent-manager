@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { navigate } from '../App';
+import { LaunchModal } from '../components/LaunchModal';
 import type { Session, RepoSummary } from '../types';
 
 const STATE_BADGES: Record<string, { label: string; cls: string }> = {
@@ -182,72 +183,6 @@ export function ListPage() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-function LaunchModal({
-  repos,
-  onClose,
-  onLaunched,
-}: {
-  repos: RepoSummary[];
-  onClose: () => void;
-  onLaunched: () => void;
-}) {
-  const [projectPath, setProjectPath] = useState(repos[0]?.project_path ?? '');
-  const [title, setTitle] = useState('');
-  const [pending, setPending] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!projectPath.trim()) {
-      setErr('Pick or type a project path');
-      return;
-    }
-    setPending(true);
-    try {
-      await api.launch({ project_path: projectPath.trim(), title: title.trim() || undefined });
-      onLaunched();
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setPending(false);
-    }
-  }
-
-  return (
-    <div className="modal-bg" onClick={onClose}>
-      <form className="modal" onClick={e => e.stopPropagation()} onSubmit={submit}>
-        <h3>Launch new session</h3>
-        <label>Project directory</label>
-        <input
-          autoFocus
-          list="repo-paths"
-          value={projectPath}
-          onChange={e => setProjectPath(e.target.value)}
-          placeholder="/Users/.../some-repo"
-        />
-        <datalist id="repo-paths">
-          {repos.map(r => (
-            <option key={r.project_path} value={r.project_path}>{r.repo_name}</option>
-          ))}
-        </datalist>
-        <label>Title (optional)</label>
-        <input
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          placeholder="e.g. fix flaky test"
-        />
-        {err && <div className="error">{err}</div>}
-        <div className="modal-actions">
-          <button type="button" className="ghost" onClick={onClose}>Cancel</button>
-          <button type="submit" className="primary" disabled={pending}>
-            {pending ? 'Launching…' : 'Launch'}
-          </button>
-        </div>
-      </form>
     </div>
   );
 }

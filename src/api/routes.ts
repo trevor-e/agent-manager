@@ -148,6 +148,18 @@ export function registerRoutes(app: FastifyInstance) {
       return;
     }
 
+    // Tell fastify we're handling the response ourselves; without this its
+    // error handler will try to reply.send() on any throw, hitting writeHead
+    // a second time and crashing the process with ERR_HTTP_HEADERS_SENT.
+    reply.hijack();
+
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+
     const send = (ev: unknown) => {
       try {
         reply.raw.write(`data: ${JSON.stringify(ev)}\n\n`);
@@ -156,18 +168,18 @@ export function registerRoutes(app: FastifyInstance) {
       }
     };
 
-    const listener = (ev: AgentEvent) => send(ev);
-    const handle = agentManager.attach(
-      { sessionId: session.id, cwd: session.project_path },
-      listener
-    );
-
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    });
+    let handle: ReturnType<typeof agentManager.attach>;
+    try {
+      const listener = (ev: AgentEvent) => send(ev);
+      handle = agentManager.attach(
+        { sessionId: session.id, cwd: session.project_path },
+        listener
+      );
+    } catch (err) {
+      send({ type: 'stderr', line: `agent attach failed: ${(err as Error).message}` });
+      reply.raw.end();
+      return;
+    }
 
     send({ type: 'attached', pendingApprovals: handle.pendingApprovals() });
     const heartbeat = setInterval(() => {
@@ -182,9 +194,6 @@ export function registerRoutes(app: FastifyInstance) {
     };
     req.raw.on('close', close);
     req.raw.on('error', close);
-
-    // Tell fastify we're handling the response ourselves.
-    return reply;
   });
 
   app.post<{ Params: { id: string }; Body: { content: string } }>(

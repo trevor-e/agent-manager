@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { Composer } from '../components/Composer';
-import { BubbleRow, eventsToBubbles } from '../components/Bubble';
-import type { Session, SessionEvent } from '../types';
+import { LaunchModal } from '../components/LaunchModal';
+import type { RepoSummary, Session, SessionEvent } from '../types';
 
 const STATE_LABELS: Record<string, string> = {
   launching: '🚀 launching',
@@ -28,6 +28,8 @@ export function DetailPage({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [notesDraft, setNotesDraft] = useState('');
+  const [launchOpen, setLaunchOpen] = useState(false);
+  const [repos, setRepos] = useState<RepoSummary[]>([]);
   const notesSavedRef = useRef('');
 
   async function refresh() {
@@ -50,6 +52,10 @@ export function DetailPage({ id }: { id: string }) {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    api.repos().then(r => setRepos(r.repos)).catch(() => {});
+  }, []);
 
   if (err) return <div className="error pad">{err}</div>;
   if (!data) return <div className="muted pad">loading…</div>;
@@ -132,6 +138,9 @@ export function DetailPage({ id }: { id: string }) {
         </div>
         <div className="grow" />
         <div className="actions">
+          <button className="primary" onClick={() => setLaunchOpen(true)} title={`New session in ${session.project_path}`}>
+            + New session
+          </button>
           <button onClick={resume}>Resume in Ghostty</button>
           <button className="ghost" onClick={markDone}>
             {session.user_status === 'done' ? 'Mark active' : 'Mark done'}
@@ -139,17 +148,8 @@ export function DetailPage({ id }: { id: string }) {
         </div>
       </div>
 
-      <Composer session={session} />
-
       <div className="detail-body">
-        <section className="events">
-          <h3 className="muted small">Conversation history (newest first)</h3>
-          <div className="bubbles">
-            {[...eventsToBubbles(events)].reverse().map(b => (
-              <BubbleRow key={b.id} bubble={b} />
-            ))}
-          </div>
-        </section>
+        <Composer key={session.id} session={session} initialEvents={events} />
         <aside className="side">
           <h3 className="muted small">Notes</h3>
           <textarea
@@ -163,6 +163,15 @@ export function DetailPage({ id }: { id: string }) {
           />
         </aside>
       </div>
+
+      {launchOpen && (
+        <LaunchModal
+          repos={repos}
+          initialProjectPath={session.project_path}
+          onClose={() => setLaunchOpen(false)}
+          onLaunched={() => setLaunchOpen(false)}
+        />
+      )}
     </div>
   );
 }
