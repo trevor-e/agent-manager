@@ -179,20 +179,40 @@ button.primary:hover { border-color: var(--accent); background: rgba(88,166,255,
   padding: 6px 6px 2px 6px;
 }
 .sidebar-item {
-  display: flex; align-items: flex-start; gap: 8px;
+  display: flex; flex-direction: column; gap: 4px;
   padding: 6px 8px; border-radius: 6px;
   text-decoration: none; color: var(--fg);
-  border: 1px solid transparent;
+  border: 1px solid transparent; min-width: 0;
 }
 .sidebar-item:hover { background: var(--bg3); border-color: var(--border); }
-.sidebar-item .state-badge { min-width: auto; padding: 1px 6px; font-size: 9px; margin-top: 2px; }
-.sidebar-item-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.sidebar-item .state-badge { min-width: auto; padding: 1px 6px; font-size: 9px; }
 .sidebar-item-title {
   font-size: 13px; color: var(--fg);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.sidebar-item-meta { display: flex; gap: 6px; align-items: center; }
-.sidebar-item-repo {
+.sidebar-item-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.sidebar-item-kbd {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 10px; color: var(--fg3);
+  padding: 1px 5px; border-radius: 4px;
+  background: var(--bg3); border: 1px solid var(--border);
+  flex-shrink: 0;
+  min-width: 30px; text-align: center;
+}
+.sidebar-item-kbd-placeholder {
+  flex-shrink: 0;
+  min-width: 30px;
+}
+.sidebar-item:hover .sidebar-item-kbd { color: var(--fg2); border-color: var(--gray); }
+.kbd-hint {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 10px; color: var(--fg3); margin-left: 6px;
+  padding: 1px 4px; border-radius: 3px;
+  background: var(--bg3); border: 1px solid var(--border);
+}
+button .kbd-hint { background: transparent; border-color: rgba(88,166,255,0.25); color: var(--accent); opacity: 0.7; }
+.sidebar-item-repo,
+.sidebar-item-branch {
   font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
   font-size: 11px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;
@@ -317,10 +337,16 @@ button.primary:hover { border-color: var(--accent); background: rgba(88,166,255,
 .composer-input-actions { display: flex; flex-direction: column; gap: 6px; }
 
 .approval-input {
-  background: var(--bg3); padding: 8px; border-radius: 6px; max-height: 360px; overflow: auto;
+  background: var(--bg3); padding: 8px; border-radius: 6px;
   font-size: 12px;
 }
-.modal-approval { width: 760px; max-height: 85vh; overflow-y: auto; }
+.modal-approval {
+  width: fit-content; min-width: 760px; max-width: 90vw;
+  max-height: 90vh; overflow-y: auto;
+}
+.modal-approval .tool-field-value,
+.modal-approval .tool-pre,
+.modal-approval .diff-body { max-height: none; }
 
 .tool-fields { display: flex; flex-direction: column; gap: 8px; }
 .tool-field { display: flex; flex-direction: column; gap: 2px; }
