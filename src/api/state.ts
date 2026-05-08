@@ -1,6 +1,7 @@
 import type { SessionRow } from '../db.ts';
 import { listRunningCwds, db } from '../db.ts';
 import { agentManager } from '../agent/manager.ts';
+import { computeUsage, type UsageTotals } from '../scanner/usage.ts';
 
 export type DerivedState =
   | 'launching'
@@ -16,6 +17,7 @@ export type SessionView = SessionRow & {
   display_name: string;
   is_running: boolean;
   web_chat_locked: boolean;
+  usage?: UsageTotals | null;
 };
 
 const RECENT_ACTIVITY_MS = 1000 * 60 * 2;
@@ -65,6 +67,16 @@ export function viewAll(rows: SessionRow[]): SessionView[] {
   const running = runningCwdsExcludingOwn();
   const locked = lockedSessionIdsExcludingOwn();
   return rows.map(r => toView(r, running, locked));
+}
+
+export async function attachUsage(views: SessionView[]): Promise<SessionView[]> {
+  await Promise.all(
+    views.map(async v => {
+      if (!v.jsonl_path) return;
+      v.usage = await computeUsage(v.jsonl_path);
+    })
+  );
+  return views;
 }
 
 export function lockedSessionIdsExcludingOwn(): Set<string> {

@@ -7,6 +7,15 @@ export type DerivedState =
   | 'done'
   | 'archived';
 
+export type UsageTotals = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  totalTokens: number;
+  costUSD: number;
+};
+
 export type Session = {
   id: string;
   host: string;
@@ -29,6 +38,7 @@ export type Session = {
   display_name: string;
   is_running: boolean;
   web_chat_locked: boolean;
+  usage?: UsageTotals | null;
 };
 
 export type RepoSummary = {

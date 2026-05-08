@@ -5,6 +5,7 @@ import { LaunchModal } from '../components/LaunchModal';
 import { SessionSidebar } from '../components/SessionSidebar';
 import type { RepoSummary, Session, SessionEvent } from '../types';
 import { useNow } from '../useNow';
+import { formatCost, formatTokens, usageTooltip } from '../format';
 
 const STATE_LABELS: Record<string, string> = {
   launching: '🚀 launching',
@@ -124,6 +125,15 @@ export function DetailPage({ id }: { id: string }) {
             )}
             <span>•</span>
             <span>last activity {ageStr(now, session.last_event_at)} ago</span>
+            {session.usage && session.usage.totalTokens > 0 && (
+              <>
+                <span>•</span>
+                <span className="usage-stat" title={usageTooltip(session.usage)}>
+                  {formatCost(session.usage.costUSD)}
+                  <span className="usage-tokens"> ({formatTokens(session.usage.totalTokens)} tok)</span>
+                </span>
+              </>
+            )}
           </div>
           {session.pr_url && (
             <div className="pr-row">

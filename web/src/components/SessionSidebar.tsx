@@ -3,6 +3,7 @@ import { api } from '../api';
 import { navigate } from '../App';
 import type { Session } from '../types';
 import { useNow } from '../useNow';
+import { formatCost, usageTooltip } from '../format';
 
 const STATE_BADGES: Record<string, { label: string; cls: string }> = {
   launching: { label: 'launching', cls: 'badge badge-launching' },
@@ -41,6 +42,11 @@ function SidebarItem({ session, showRepo }: { session: Session; showRepo: boolea
         <div className="sidebar-item-meta muted small">
           {showRepo && <span className="sidebar-item-repo">{session.repo_name}</span>}
           <span>{ageStr(now, session.last_event_at)}</span>
+          {session.usage && session.usage.totalTokens > 0 && (
+            <span className="sidebar-item-cost" title={usageTooltip(session.usage)}>
+              {formatCost(session.usage.costUSD)}
+            </span>
+          )}
         </div>
       </div>
     </a>

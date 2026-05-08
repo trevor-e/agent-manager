@@ -15,10 +15,12 @@ import { launchSession } from '../launcher/terminal.ts';
 import {
   viewAll,
   toView,
+  attachUsage,
   runningCwdsExcludingOwn,
   lockedSessionIdsExcludingOwn,
   type SessionView,
 } from './state.ts';
+import { computeUsage } from '../scanner/usage.ts';
 import { agentManager } from '../agent/manager.ts';
 import type { AgentEvent } from '../agent/process.ts';
 import { log, type LogLevel } from '../log.ts';
@@ -34,7 +36,8 @@ export function registerRoutes(app: FastifyInstance) {
   app.get('/api/sessions', async (req) => {
     const q = (req.query ?? {}) as { status?: string; repo?: string; q?: string };
     const rows = listSessions({ status: q.status, repo: q.repo, q: q.q });
-    return { sessions: viewAll(rows) };
+    const views = await attachUsage(viewAll(rows));
+    return { sessions: views };
   });
 
   app.get('/api/repos', async () => {
@@ -64,6 +67,9 @@ export function registerRoutes(app: FastifyInstance) {
     const running = runningCwdsExcludingOwn();
     const locked = lockedSessionIdsExcludingOwn();
     const view = toView(row, running, locked);
+    if (row.jsonl_path) {
+      view.usage = await computeUsage(row.jsonl_path);
+    }
     const events = row.jsonl_path && existsSync(row.jsonl_path)
       ? await readLastEvents(row.jsonl_path, 50)
       : [];

@@ -4,6 +4,7 @@ import { navigate } from '../App';
 import { LaunchModal } from '../components/LaunchModal';
 import type { Session, RepoSummary } from '../types';
 import { useNow } from '../useNow';
+import { formatCost, usageTooltip } from '../format';
 
 const STATE_BADGES: Record<string, { label: string; cls: string }> = {
   launching: { label: 'launching', cls: 'badge badge-launching' },
@@ -161,6 +162,11 @@ export function ListPage() {
                 </a>
               )}
               {s.git_branch && <span className="muted small">{s.git_branch}</span>}
+              {s.usage && s.usage.totalTokens > 0 && (
+                <span className="usage-pill" title={usageTooltip(s.usage)}>
+                  {formatCost(s.usage.costUSD)}
+                </span>
+              )}
               <span className="grow" />
               <div className="row-actions">
                 <button className="primary" onClick={() => resume(s)} title="Resume in Ghostty">
