@@ -317,7 +317,7 @@ button.primary:hover { border-color: var(--accent); background: rgba(88,166,255,
   background: var(--bg3); padding: 8px; border-radius: 6px; max-height: 360px; overflow: auto;
   font-size: 12px;
 }
-.modal-approval { max-height: 80vh; overflow-y: auto; }
+.modal-approval { width: 760px; max-height: 85vh; overflow-y: auto; }
 
 .tool-fields { display: flex; flex-direction: column; gap: 8px; }
 .tool-field { display: flex; flex-direction: column; gap: 2px; }
