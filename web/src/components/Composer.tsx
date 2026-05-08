@@ -509,7 +509,7 @@ export function Composer({
 }
 
 function shouldShowThinking(bubbles: Bubble[]): boolean {
-  if (bubbles.length === 0) return true;
+  if (bubbles.length === 0) return false;
   const last = bubbles[bubbles.length - 1];
   if (last.kind === 'assistant') return false;
   if (last.kind === 'tool_use' && (last.status === 'pending' || last.status === 'allowed')) {
