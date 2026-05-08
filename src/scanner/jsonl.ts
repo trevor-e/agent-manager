@@ -269,7 +269,7 @@ export async function scanJsonl(): Promise<{ scanned: number; updated: number }>
       const rawPath = extracted.cwd ?? decodeProjectDir(projectDir);
       const worktreeMatch = rawPath.match(/^(.+?)\/\.claude\/worktrees\/[^/]+$/);
       const projectPathFromCwd = worktreeMatch ? worktreeMatch[1] : rawPath;
-      const repoName = projectPathFromCwd.split('/').filter(Boolean).pop() ?? projectDir;
+      const repoName = repoNameFromPath(projectPathFromCwd);
       const autoTitle = extracted.customTitle ?? extracted.aiTitle ?? extracted.firstUserPrompt ?? null;
       const lastEventAt = extracted.lastTimestampMs ?? fileMtime;
 
@@ -318,4 +318,10 @@ function resolveSegments(base: string, segments: string[]): string | null {
     }
   }
   return null;
+}
+
+export function repoNameFromPath(projectPath: string): string {
+  const worktreeMatch = projectPath.match(/^(.+)\/\.claude\/worktrees\/[^/]+$/);
+  const root = worktreeMatch ? worktreeMatch[1] : projectPath;
+  return root.split('/').filter(Boolean).pop() ?? projectPath;
 }

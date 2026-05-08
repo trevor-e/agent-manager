@@ -13,6 +13,7 @@ import {
 import type { LaunchOptions } from '../../shared/types.ts';
 import { PERMISSION_MODES, EFFORT_LEVELS } from '../../shared/constants.ts';
 import { runScanOnce } from '../../scanner/index.ts';
+import { repoNameFromPath } from '../../scanner/jsonl.ts';
 import { launchSession } from '../../launcher/terminal.ts';
 import {
   viewAll,
@@ -127,9 +128,7 @@ export function registerSessionRoutes(app: FastifyInstance) {
     }
 
     const id = randomUUID();
-    const worktreeMatch = project_path.match(/^(.+?)\/\.claude\/worktrees\/[^/]+$/);
-    const resolvedPath = worktreeMatch ? worktreeMatch[1] : project_path;
-    const repoName = resolvedPath.split('/').filter(Boolean).pop() ?? project_path;
+    const repoName = repoNameFromPath(project_path);
     const now = Date.now();
 
     let linearIssueId: string | null = null;
@@ -200,7 +199,7 @@ export function registerSessionRoutes(app: FastifyInstance) {
       return { error: 'session not found' };
     }
     const id = randomUUID();
-    const repoName = parent.project_path.split('/').filter(Boolean).pop() ?? parent.project_path;
+    const repoName = repoNameFromPath(parent.project_path);
     const now = Date.now();
     const normalized = normalizeLaunchOptions(req.body?.launch_options) ?? {};
     normalized.forkFrom = parent.id;

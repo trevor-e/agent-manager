@@ -12,7 +12,7 @@ export const db = new Database(config.dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS schema_meta (
