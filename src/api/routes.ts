@@ -25,6 +25,7 @@ import {
 import { computeUsage } from '../scanner/usage.ts';
 import { agentManager } from '../agent/manager.ts';
 import type { AgentEvent } from '../agent/process.ts';
+import type { UserContentBlock } from '../agent/types.ts';
 import { log, type LogLevel } from '../log.ts';
 import { getBranchChanges, getWorkingChanges } from './git.ts';
 
@@ -249,25 +250,46 @@ export function registerRoutes(app: FastifyInstance) {
     req.raw.on('error', close);
   });
 
-  app.post<{ Params: { id: string }; Body: { content: string } }>(
+  app.post<{
+    Params: { id: string };
+    Body: {
+      content: string;
+      images?: Array<{ mediaType: string; data: string }>;
+    };
+  }>(
     '/api/sessions/:id/messages',
+    { bodyLimit: 25 * 1024 * 1024 },
     async (req, reply) => {
       const session = getSession(req.params.id);
       if (!session) {
         reply.code(404);
         return { error: 'session not found' };
       }
-      const content = (req.body?.content ?? '').toString();
-      if (!content.trim()) {
+      const text = (req.body?.content ?? '').toString();
+      const images = Array.isArray(req.body?.images) ? req.body!.images! : [];
+      if (!text.trim() && images.length === 0) {
         reply.code(400);
-        return { error: 'content is required' };
+        return { error: 'content or images required' };
       }
       const proc = agentManager.get(session.id);
       if (!proc || !proc.isAlive()) {
         reply.code(409);
         return { error: 'no live agent; open the session in the dashboard first' };
       }
-      await proc.sendUserMessage(content);
+      if (images.length === 0) {
+        await proc.sendUserMessage(text);
+      } else {
+        const blocks: UserContentBlock[] = [];
+        for (const img of images) {
+          if (!img || typeof img.mediaType !== 'string' || typeof img.data !== 'string') continue;
+          blocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: img.mediaType, data: img.data },
+          });
+        }
+        if (text.trim()) blocks.push({ type: 'text', text });
+        await proc.sendUserMessage(blocks);
+      }
       return { ok: true };
     }
   );

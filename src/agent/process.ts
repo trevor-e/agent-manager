@@ -12,6 +12,7 @@ import type {
   OutgoingUserMessage,
   PermissionMode,
   PermissionResult,
+  UserContentBlock,
 } from './types.ts';
 
 function parseLaunchOptions(raw: string | null | undefined): LaunchOptions | null {
@@ -141,7 +142,7 @@ export class AgentProcess extends EventEmitter {
 
   // -------- outgoing -------- //
 
-  async sendUserMessage(content: string) {
+  async sendUserMessage(content: string | UserContentBlock[]) {
     if (!this.child) throw new Error('agent not started');
     if (this.exited) throw new Error('agent has exited');
     const msg: OutgoingUserMessage = {

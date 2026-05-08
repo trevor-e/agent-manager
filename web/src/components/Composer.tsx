@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { api } from '../api';
 import type { PermissionMode, Session, SessionEvent } from '../types';
 import {
@@ -21,6 +21,17 @@ type AgentEvent =
 
 type Approval = { approvalId: string; toolName: string; input: any };
 
+type Attachment = {
+  id: string;
+  name: string;
+  mediaType: string;
+  base64: string;
+  dataUrl: string;
+};
+
+const MAX_ATTACHMENT_BYTES = 18 * 1024 * 1024;
+const SUPPORTED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+
 export function Composer({
   session,
   initialEvents,
@@ -33,9 +44,13 @@ export function Composer({
   const [connected, setConnected] = useState(false);
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bubbleIdCounter = useRef(0);
+  const attachmentIdCounter = useRef(0);
   const esRef = useRef<EventSource | null>(null);
 
   const showCoexistWarning = session.is_running;
@@ -202,12 +217,31 @@ export function Composer({
     textareaRef.current?.focus();
   }, [session.id]);
 
-  async function sendPrompt(text: string) {
-    if (pending || !text.trim()) return;
+  useEffect(() => {
+    const pending = approvals[0];
+    if (!pending) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        resolveApprovalAction(pending.approvalId, 'deny');
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [approvals]);
+
+  async function sendPrompt(text: string, imgs: Attachment[] = []) {
+    if (pending) return;
+    if (!text.trim() && imgs.length === 0) return;
     setPending(true);
-    addBubble({ kind: 'user', text } as Bubble);
+    addBubble({
+      kind: 'user',
+      text,
+      ...(imgs.length ? { images: imgs.map(a => ({ dataUrl: a.dataUrl })) } : {}),
+    } as Bubble);
     try {
-      await api.sendMessage(session.id, text);
+      const apiImages = imgs.map(a => ({ mediaType: a.mediaType, data: a.base64 }));
+      await api.sendMessage(session.id, text, apiImages);
     } catch (e) {
       addBubble({ kind: 'system', text: `error: ${(e as Error).message}` } as Bubble);
     } finally {
@@ -216,10 +250,65 @@ export function Composer({
   }
 
   async function send() {
-    if (!draft.trim() || pending) return;
+    if (pending) return;
+    if (!draft.trim() && attachments.length === 0) return;
     const text = draft;
+    const imgs = attachments;
     setDraft('');
-    await sendPrompt(text);
+    setAttachments([]);
+    setAttachError(null);
+    await sendPrompt(text, imgs);
+  }
+
+  async function addFiles(files: File[]) {
+    const accepted: Attachment[] = [];
+    let errored: string | null = null;
+    for (const f of files) {
+      if (!SUPPORTED_IMAGE_TYPES.has(f.type)) {
+        errored = `unsupported file type: ${f.type || f.name}`;
+        continue;
+      }
+      if (f.size > MAX_ATTACHMENT_BYTES) {
+        errored = `${f.name} is too large (max ${(MAX_ATTACHMENT_BYTES / (1024 * 1024)).toFixed(0)}MB)`;
+        continue;
+      }
+      try {
+        const { base64, dataUrl } = await fileToBase64(f);
+        accepted.push({
+          id: `A${++attachmentIdCounter.current}`,
+          name: f.name || 'image',
+          mediaType: f.type,
+          base64,
+          dataUrl,
+        });
+      } catch (e) {
+        errored = `failed to read ${f.name}`;
+      }
+    }
+    if (accepted.length) setAttachments(prev => [...prev, ...accepted]);
+    setAttachError(errored);
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments(prev => prev.filter(a => a.id !== id));
+  }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (files.length) void addFiles(files);
+  }
+
+  function handleDragOver(e: DragEvent) {
+    if (Array.from(e.dataTransfer.items).some(i => i.kind === 'file')) {
+      e.preventDefault();
+      setDragOver(true);
+    }
+  }
+
+  function handleDragLeave(e: DragEvent) {
+    if (e.currentTarget === e.target) setDragOver(false);
   }
 
   async function resolveApprovalAction(
@@ -271,7 +360,12 @@ export function Composer({
   }
 
   return (
-    <div className="composer">
+    <div
+      className={'composer' + (dragOver ? ' composer-dragover' : '')}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="composer-header">
         <h3 className="muted small">
           Conversation {connected ? <span className="dot dot-on" title="connected" /> : <span className="dot dot-off" title="disconnected" />}
@@ -319,6 +413,25 @@ export function Composer({
         </button>
       </div>
 
+      {(attachments.length > 0 || attachError) && (
+        <div className="composer-attachments">
+          {attachments.map(a => (
+            <div key={a.id} className="attachment-chip" title={a.name}>
+              <img src={a.dataUrl} alt="" className="attachment-thumb" />
+              <button
+                type="button"
+                className="attachment-remove"
+                aria-label={`remove ${a.name}`}
+                onClick={() => removeAttachment(a.id)}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          {attachError && <span className="attachment-error small">{attachError}</span>}
+        </div>
+      )}
+
       <div className="composer-input">
         <textarea
           ref={textareaRef}
@@ -331,13 +444,17 @@ export function Composer({
               send();
             }
           }}
-          placeholder="message claude…  (⌘+Enter to send)"
+          placeholder="message claude…  (⌘+Enter to send, drop images to attach)"
         />
         <div className="composer-input-actions">
           <button className="ghost" onClick={interrupt} title="Stop the current generation (chat keeps going)">
             Interrupt
           </button>
-          <button className="primary" disabled={pending || !draft.trim()} onClick={send}>
+          <button
+            className="primary"
+            disabled={pending || (!draft.trim() && attachments.length === 0)}
+            onClick={send}
+          >
             {pending ? 'sending…' : 'Send'}
           </button>
         </div>
@@ -352,6 +469,20 @@ export function Composer({
       )}
     </div>
   );
+}
+
+function fileToBase64(file: File): Promise<{ base64: string; dataUrl: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('read failed'));
+    reader.onload = () => {
+      const dataUrl = String(reader.result ?? '');
+      const comma = dataUrl.indexOf(',');
+      const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : '';
+      resolve({ base64, dataUrl });
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function extractToolResultText(content: any): string {

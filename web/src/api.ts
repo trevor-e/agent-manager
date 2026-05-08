@@ -40,8 +40,15 @@ export const api = {
   repos: () => jget<{ repos: RepoSummary[] }>('/api/repos'),
   scan: () => jsend<{ ok: boolean }>('/api/scan', 'POST'),
 
-  sendMessage: (id: string, content: string) =>
-    jsend<{ ok: boolean }>(`/api/sessions/${id}/messages`, 'POST', { content }),
+  sendMessage: (
+    id: string,
+    content: string,
+    images?: Array<{ mediaType: string; data: string }>
+  ) =>
+    jsend<{ ok: boolean }>(`/api/sessions/${id}/messages`, 'POST', {
+      content,
+      ...(images && images.length ? { images } : {}),
+    }),
   resolveApproval: (
     id: string,
     approvalId: string,

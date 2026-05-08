@@ -10,9 +10,16 @@ export type PermissionMode =
   | 'auto'
   | 'dontAsk';
 
+export type ImageContentBlock = {
+  type: 'image';
+  source: { type: 'base64'; media_type: string; data: string };
+};
+export type TextContentBlock = { type: 'text'; text: string };
+export type UserContentBlock = TextContentBlock | ImageContentBlock;
+
 export type OutgoingUserMessage = {
   type: 'user';
-  message: { role: 'user'; content: string };
+  message: { role: 'user'; content: string | UserContentBlock[] };
 };
 
 export type ControlRequestEnvelope = {

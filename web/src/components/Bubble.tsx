@@ -4,7 +4,8 @@ import { Markdown } from './Markdown';
 import { UnifiedDiff, AdditionsView } from './UnifiedDiff';
 
 export type AssistantBubble = { kind: 'assistant'; id: string; messageId: string; text: string };
-export type UserBubble = { kind: 'user'; id: string; text: string };
+export type UserImage = { dataUrl: string };
+export type UserBubble = { kind: 'user'; id: string; text: string; images?: UserImage[] };
 export type ToolUseBubble = {
   kind: 'tool_use';
   id: string;
@@ -54,10 +55,15 @@ export function eventsToBubbles(events: any[]): Bubble[] {
         if (cleaned) bubbles.push({ kind: 'user', id: nextId(), text: cleaned });
       } else if (Array.isArray(content)) {
         const text: string[] = [];
+        const images: UserImage[] = [];
         for (const c of content) {
           if (!c) continue;
           if (c.type === 'text' && typeof c.text === 'string') text.push(c.text);
-          else if (c.type === 'tool_result' && c.tool_use_id) {
+          else if (c.type === 'image' && c.source?.type === 'base64' && c.source.data) {
+            images.push({
+              dataUrl: `data:${c.source.media_type ?? 'image/png'};base64,${c.source.data}`,
+            });
+          } else if (c.type === 'tool_result' && c.tool_use_id) {
             const resultText = extractToolResultText(c.content);
             const tool = toolByUseId.get(c.tool_use_id);
             if (tool) {
@@ -69,7 +75,14 @@ export function eventsToBubbles(events: any[]): Bubble[] {
           }
         }
         const cleaned = cleanUserPrompt(text.join(''));
-        if (cleaned) bubbles.push({ kind: 'user', id: nextId(), text: cleaned });
+        if (cleaned || images.length) {
+          bubbles.push({
+            kind: 'user',
+            id: nextId(),
+            text: cleaned,
+            ...(images.length ? { images } : {}),
+          });
+        }
       }
       continue;
     }
@@ -215,7 +228,16 @@ export function BubbleRow({ bubble }: { bubble: Bubble }) {
   if (bubble.kind === 'user') {
     return (
       <div className="bubble-row bubble-row-user">
-        <div className="bubble bubble-user">{bubble.text}</div>
+        <div className="bubble bubble-user">
+          {bubble.images?.length ? (
+            <div className="bubble-user-images">
+              {bubble.images.map((img, i) => (
+                <img key={i} src={img.dataUrl} alt="" className="bubble-user-image" />
+              ))}
+            </div>
+          ) : null}
+          {bubble.text && <div className="bubble-user-text">{bubble.text}</div>}
+        </div>
       </div>
     );
   }
