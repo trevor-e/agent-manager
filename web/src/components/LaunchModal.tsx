@@ -45,6 +45,7 @@ export function LaunchModal({
   const [addDirsText, setAddDirsText] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [appendSystemPrompt, setAppendSystemPrompt] = useState('');
+  const [linearInput, setLinearInput] = useState('');
   const [pending, setPending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -64,6 +65,7 @@ export function LaunchModal({
     if (systemPrompt.trim()) opts.systemPrompt = systemPrompt.trim();
     if (appendSystemPrompt.trim()) opts.appendSystemPrompt = appendSystemPrompt.trim();
     if (linearIssue) opts.linearIssueId = linearIssue.id;
+    else if (linearInput.trim()) opts.linearIssueId = linearInput.trim();
     return opts;
   }
 
@@ -118,6 +120,17 @@ export function LaunchModal({
           onChange={e => setTitle(e.target.value)}
           placeholder="e.g. fix flaky test"
         />
+
+        {!linearIssue && (
+          <>
+            <label>Linear issue (optional)</label>
+            <input
+              value={linearInput}
+              onChange={e => setLinearInput(e.target.value)}
+              placeholder="e.g. ENG-123"
+            />
+          </>
+        )}
 
         <label>Permission mode</label>
         <select value={permissionMode} onChange={e => setPermissionMode(e.target.value as PermissionMode)}>
