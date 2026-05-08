@@ -196,11 +196,9 @@ export function Composer({
     }
   }, [bubbles, approvals]);
 
-  async function send() {
-    if (!draft.trim() || pending) return;
+  async function sendPrompt(text: string) {
+    if (pending || !text.trim()) return;
     setPending(true);
-    const text = draft;
-    setDraft('');
     addBubble({ kind: 'user', text } as Bubble);
     try {
       await api.sendMessage(session.id, text);
@@ -209,6 +207,13 @@ export function Composer({
     } finally {
       setPending(false);
     }
+  }
+
+  async function send() {
+    if (!draft.trim() || pending) return;
+    const text = draft;
+    setDraft('');
+    await sendPrompt(text);
   }
 
   async function resolveApprovalAction(
@@ -256,6 +261,17 @@ export function Composer({
           <div className="muted small pad">No messages yet — say something to wake up the agent.</div>
         )}
         {bubbles.map(b => <BubbleRow key={b.id} bubble={b} />)}
+      </div>
+
+      <div className="composer-quick-actions">
+        <button
+          className="ghost quick-action"
+          disabled={pending}
+          onClick={() => sendPrompt('commit the changes')}
+          title="Send: commit the changes"
+        >
+          Commit changes
+        </button>
       </div>
 
       <div className="composer-input">

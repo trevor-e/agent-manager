@@ -305,6 +305,9 @@ button.primary:hover { border-color: var(--accent); background: rgba(88,166,255,
 }
 .tool-pre-error { border-left: 2px solid var(--red); }
 
+.composer-quick-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.quick-action { padding: 4px 10px; font-size: 12px; }
+
 .composer-input { display: flex; gap: 8px; align-items: flex-end; }
 .composer-input textarea {
   flex: 1; background: var(--bg3); border: 1px solid var(--border); color: var(--fg);
