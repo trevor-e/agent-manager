@@ -1,4 +1,5 @@
 import { stat, readFile } from 'node:fs/promises';
+import { getModelPricing } from './pricing.ts';
 
 export type UsageTotals = {
   inputTokens: number;
@@ -8,23 +9,6 @@ export type UsageTotals = {
   totalTokens: number;
   costUSD: number;
 };
-
-// USD per million tokens. Approximate Anthropic public list prices.
-const PRICE_PER_M: Record<
-  'opus' | 'sonnet' | 'haiku',
-  { input: number; output: number; cacheRead: number; cacheCreation: number }
-> = {
-  opus:   { input: 15,   output: 75,  cacheRead: 1.5,  cacheCreation: 18.75 },
-  sonnet: { input: 3,    output: 15,  cacheRead: 0.3,  cacheCreation: 3.75 },
-  haiku:  { input: 1,    output: 5,   cacheRead: 0.1,  cacheCreation: 1.25 },
-};
-
-function priceFor(model: string) {
-  if (model.includes('opus')) return PRICE_PER_M.opus;
-  if (model.includes('sonnet')) return PRICE_PER_M.sonnet;
-  if (model.includes('haiku')) return PRICE_PER_M.haiku;
-  return null;
-}
 
 type CacheEntry = { mtimeMs: number; size: number; totals: UsageTotals };
 const cache = new Map<string, CacheEntry>();
@@ -84,20 +68,44 @@ export async function computeUsage(path: string): Promise<UsageTotals | null> {
     costUSD: 0,
   };
 
+  const pricingByModel = new Map<string, Awaited<ReturnType<typeof getModelPricing>>>();
+
   for (const { model, usage } of [...byId.values(), ...anonymous]) {
     const input = numField(usage, 'input_tokens');
     const output = numField(usage, 'output_tokens');
     const cr = numField(usage, 'cache_read_input_tokens');
     const cc = numField(usage, 'cache_creation_input_tokens');
+    const cacheBlock = (usage as any).cache_creation;
+    const cc1h =
+      cacheBlock && typeof cacheBlock === 'object'
+        ? numField(cacheBlock, 'ephemeral_1h_input_tokens')
+        : 0;
+    const cc5m =
+      cacheBlock && typeof cacheBlock === 'object'
+        ? numField(cacheBlock, 'ephemeral_5m_input_tokens')
+        : 0;
+
     totals.inputTokens += input;
     totals.outputTokens += output;
     totals.cacheReadTokens += cr;
     totals.cacheCreationTokens += cc;
-    const p = priceFor(model);
+
+    if (!pricingByModel.has(model)) {
+      pricingByModel.set(model, await getModelPricing(model));
+    }
+    const p = pricingByModel.get(model);
     if (p) {
+      // Prefer the breakdown from cache_creation when present; fall back to the
+      // flat cache_creation_input_tokens at the 5m rate if it isn't.
+      const breakdownTotal = cc1h + cc5m;
+      const ccFlatRemainder = breakdownTotal > 0 ? 0 : cc;
       totals.costUSD +=
-        (input * p.input + output * p.output + cr * p.cacheRead + cc * p.cacheCreation) /
-        1_000_000;
+        input * p.inputCostPerToken +
+        output * p.outputCostPerToken +
+        cr * p.cacheReadCostPerToken +
+        cc1h * p.cacheCreationCostPerTokenAbove1hr +
+        cc5m * p.cacheCreationCostPerToken +
+        ccFlatRemainder * p.cacheCreationCostPerToken;
     }
   }
   totals.totalTokens =
