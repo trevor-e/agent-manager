@@ -64,6 +64,19 @@ export function ListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta || e.shiftKey || e.altKey) return;
+      if (e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        setLaunchOpen(true);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const filtered = useMemo(() => {
     let list = sessions;
     if (repoFilter) list = list.filter(s => s.repo_name === repoFilter);
@@ -119,7 +132,9 @@ export function ListPage() {
         )}
         <div className="grow" />
         <span className="muted">{filtered.length} sessions</span>
-        <button className="primary" onClick={() => setLaunchOpen(true)}>+ New session</button>
+        <button className="primary" onClick={() => setLaunchOpen(true)} title="New session">
+          + New session <kbd className="kbd-hint">⌘E</kbd>
+        </button>
       </div>
 
       {loading && <div className="muted pad">loading…</div>}

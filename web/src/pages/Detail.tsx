@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
+import { navigate } from '../App';
 import { Composer } from '../components/Composer';
 import { LaunchModal } from '../components/LaunchModal';
-import { SessionSidebar } from '../components/SessionSidebar';
+import { SessionSidebar, sortSidebarSessions } from '../components/SessionSidebar';
+import { computeSlots, rememberSlotNav } from '../sessionSlots';
 import type { RepoSummary, Session, SessionEvent } from '../types';
 import { useNow } from '../useNow';
 import { formatCost, formatTokens, usageTooltip } from '../format';
@@ -26,6 +28,13 @@ function ageStr(now: number, ms: number): string {
   return `${Math.floor(d / 86_400_000)}d`;
 }
 
+function isInputFocused(): boolean {
+  const el = document.activeElement as HTMLElement | null;
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+}
+
 export function DetailPage({ id }: { id: string }) {
   const [data, setData] = useState<{ session: Session; events: SessionEvent[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -33,6 +42,8 @@ export function DetailPage({ id }: { id: string }) {
   const [titleDraft, setTitleDraft] = useState('');
   const [launchOpen, setLaunchOpen] = useState(false);
   const [repos, setRepos] = useState<RepoSummary[]>([]);
+  const [activeSessions, setActiveSessions] = useState<Session[]>([]);
+  const [activeLoaded, setActiveLoaded] = useState(false);
   const now = useNow();
 
   async function refresh() {
@@ -56,9 +67,41 @@ export function DetailPage({ id }: { id: string }) {
     api.repos().then(r => setRepos(r.repos)).catch(() => {});
   }, []);
 
-  if (err) return <div className="error pad">{err}</div>;
-  if (!data) return <div className="muted pad">loading…</div>;
-  const { session, events } = data;
+  useEffect(() => {
+    let cancelled = false;
+    async function refreshActive() {
+      try {
+        const r = await api.listSessions({ status: 'active' });
+        if (!cancelled) {
+          setActiveSessions(r.sessions);
+          setActiveLoaded(true);
+        }
+      } catch {
+        if (!cancelled) setActiveLoaded(true);
+      }
+    }
+    refreshActive();
+    const t = setInterval(refreshActive, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, []);
+
+  const session = data?.session;
+  const sortedOthers = useMemo(() => {
+    if (!session) return [];
+    return sortSidebarSessions(session.id, session.repo_name, activeSessions);
+  }, [session, activeSessions]);
+  const { slotBySessionId, sessionBySlot } = useMemo(() => {
+    if (!session) {
+      return {
+        slotBySessionId: new Map<string, number>(),
+        sessionBySlot: new Map<number, string>(),
+      };
+    }
+    return computeSlots(session.id, sortedOthers);
+  }, [session, sortedOthers]);
 
   async function saveTitle(value: string | null) {
     await api.patchSession(id, { title: value });
@@ -66,6 +109,7 @@ export function DetailPage({ id }: { id: string }) {
   }
 
   async function markDone() {
+    if (!session) return;
     await api.patchSession(id, {
       user_status: session.user_status === 'done' ? 'active' : 'done',
     });
@@ -73,8 +117,46 @@ export function DetailPage({ id }: { id: string }) {
   }
 
   async function resume() {
+    if (!session) return;
     await api.launch({ project_path: session.project_path, resume_id: session.id });
   }
+
+  useEffect(() => {
+    if (!session) return;
+    const currentId = session.id;
+    function onKey(e: KeyboardEvent) {
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta) return;
+      if (editing) return;
+      const key = e.key.toLowerCase();
+      if (!e.shiftKey && !e.altKey && key === 'e') {
+        e.preventDefault();
+        setLaunchOpen(true);
+        return;
+      }
+      if (!e.shiftKey && !e.altKey && key === '.') {
+        if (isInputFocused()) return;
+        e.preventDefault();
+        markDone();
+        return;
+      }
+      if (!e.shiftKey && !e.altKey && /^[1-9]$/.test(e.key)) {
+        const slot = Number(e.key);
+        const targetId = sessionBySlot.get(slot);
+        if (!targetId) return;
+        e.preventDefault();
+        rememberSlotNav(currentId, targetId, slot);
+        navigate(`/sessions/${targetId}`);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, sessionBySlot, editing]);
+
+  if (err) return <div className="error pad">{err}</div>;
+  if (!data || !session) return <div className="muted pad">loading…</div>;
+  const { events } = data;
 
   return (
     <div className="detail">
@@ -145,19 +227,26 @@ export function DetailPage({ id }: { id: string }) {
         </div>
         <div className="grow" />
         <div className="actions">
-          <button className="primary" onClick={() => setLaunchOpen(true)} title={`New session in ${session.project_path}`}>
-            + New session
+          <button className="primary" onClick={() => setLaunchOpen(true)} title="New session">
+            + New session <kbd className="kbd-hint">⌘E</kbd>
           </button>
           <button onClick={resume}>Resume in Ghostty</button>
-          <button className="ghost" onClick={markDone}>
+          <button className="ghost" onClick={markDone} title="Toggle done">
             {session.user_status === 'done' ? 'Mark active' : 'Mark done'}
+            <kbd className="kbd-hint">⌘.</kbd>
           </button>
         </div>
       </div>
 
       <div className="detail-body">
         <Composer key={session.id} session={session} initialEvents={events} />
-        <SessionSidebar currentSessionId={session.id} currentRepoName={session.repo_name} />
+        <SessionSidebar
+          currentSessionId={session.id}
+          currentRepoName={session.repo_name}
+          sessions={activeSessions}
+          loaded={activeLoaded}
+          slotBySessionId={slotBySessionId}
+        />
       </div>
 
       {launchOpen && (
@@ -171,4 +260,3 @@ export function DetailPage({ id }: { id: string }) {
     </div>
   );
 }
-
