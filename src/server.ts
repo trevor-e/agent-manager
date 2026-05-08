@@ -6,6 +6,7 @@ import { config } from './config.ts';
 import { registerRoutes } from './api/routes.ts';
 import { startScanner, stopScanner } from './scanner/index.ts';
 import { agentManager } from './agent/manager.ts';
+import { killOrphanedAgents } from './agent/cleanup.ts';
 import { log, logPathResolved } from './log.ts';
 
 process.on('uncaughtException', err => {
@@ -58,8 +59,10 @@ if (existsSync(distDir)) {
   }));
 }
 
-app.listen({ port: config.port, host: '127.0.0.1' }).then(() => {
+app.listen({ port: config.port, host: '127.0.0.1' }).then(async () => {
   log('info', 'server', `listening at http://localhost:${config.port}`, { logFile: logPathResolved });
+  const killed = await killOrphanedAgents();
+  if (killed > 0) log('info', 'server', `cleaned up ${killed} orphaned agent(s)`);
   log('info', 'server', `scanning ${config.projectsDir} every ${config.scanIntervalMs}ms`);
   startScanner();
 });
