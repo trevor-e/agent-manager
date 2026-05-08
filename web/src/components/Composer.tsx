@@ -33,6 +33,7 @@ export function Composer({
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bubbleIdCounter = useRef(0);
   const esRef = useRef<EventSource | null>(null);
 
@@ -196,6 +197,10 @@ export function Composer({
     }
   }, [bubbles, approvals]);
 
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, [session.id]);
+
   async function sendPrompt(text: string) {
     if (pending || !text.trim()) return;
     setPending(true);
@@ -229,6 +234,8 @@ export function Composer({
         kind: 'system',
         text: `approval was no longer valid (${(e as Error).message}); the agent likely restarted`,
       } as Bubble);
+    } finally {
+      textareaRef.current?.focus();
     }
   }
 
@@ -276,6 +283,7 @@ export function Composer({
 
       <div className="composer-input">
         <textarea
+          ref={textareaRef}
           rows={3}
           value={draft}
           onChange={e => setDraft(e.target.value)}
