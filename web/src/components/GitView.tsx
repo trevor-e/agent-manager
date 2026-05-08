@@ -140,7 +140,7 @@ function FileBlock({ file }: { file: FileChange }) {
         <span className="git-file-toggle">{open ? '▾' : '▸'}</span>
       </button>
       {open && !file.binary && file.diff && (
-        <RawUnifiedDiff diff={file.diff} />
+        <RawUnifiedDiff diff={file.diff} filePath={file.path} />
       )}
     </div>
   );
