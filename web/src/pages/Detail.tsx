@@ -158,6 +158,12 @@ export function DetailPage({ id }: { id: string }) {
         setView(v => (v === 'conversation' ? 'diff' : 'conversation'));
         return;
       }
+      if (e.shiftKey && !e.altKey && key === 'f') {
+        if (isInputFocused()) return;
+        e.preventDefault();
+        fork();
+        return;
+      }
       if (!e.shiftKey && !e.altKey && /^[1-9]$/.test(e.key)) {
         const slot = Number(e.key);
         const targetId = sessionBySlot.get(slot);
@@ -273,7 +279,7 @@ export function DetailPage({ id }: { id: string }) {
             {view === 'conversation' ? 'View changes' : 'View chat'}
             <kbd className="kbd-hint">⌘B</kbd>
           </button>
-          <button onClick={fork} title="Fork this session into a new one">Fork</button>
+          <button onClick={fork} title="Fork this session into a new one (⇧⌘F)">Fork</button>
           <button onClick={resume}>Resume in Ghostty</button>
           <button className="ghost" onClick={markDone} title="Toggle done">
             {session.user_status === 'done' ? 'Mark active' : 'Mark done'}
