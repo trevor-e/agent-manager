@@ -266,7 +266,9 @@ export async function scanJsonl(): Promise<{ scanned: number; updated: number }>
         continue;
       }
 
-      const projectPathFromCwd = extracted.cwd ?? decodeProjectDir(projectDir);
+      const rawPath = extracted.cwd ?? decodeProjectDir(projectDir);
+      const worktreeMatch = rawPath.match(/^(.+?)\/\.claude\/worktrees\/[^/]+$/);
+      const projectPathFromCwd = worktreeMatch ? worktreeMatch[1] : rawPath;
       const repoName = projectPathFromCwd.split('/').filter(Boolean).pop() ?? projectDir;
       const autoTitle = extracted.customTitle ?? extracted.aiTitle ?? extracted.firstUserPrompt ?? null;
       const lastEventAt = extracted.lastTimestampMs ?? fileMtime;

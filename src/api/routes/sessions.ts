@@ -127,7 +127,9 @@ export function registerSessionRoutes(app: FastifyInstance) {
     }
 
     const id = randomUUID();
-    const repoName = project_path.split('/').filter(Boolean).pop() ?? project_path;
+    const worktreeMatch = project_path.match(/^(.+?)\/\.claude\/worktrees\/[^/]+$/);
+    const resolvedPath = worktreeMatch ? worktreeMatch[1] : project_path;
+    const repoName = resolvedPath.split('/').filter(Boolean).pop() ?? project_path;
     const now = Date.now();
 
     let linearIssueId: string | null = null;
