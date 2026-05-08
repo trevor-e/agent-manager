@@ -46,14 +46,29 @@ class AgentManager {
     if (!entry) return;
     entry.listeners.delete(listener);
     if (entry.listeners.size === 0) {
-      entry.idleTimer = setTimeout(() => {
-        const e = this.entries.get(sessionId);
-        if (e && e.listeners.size === 0) {
-          e.process.stop();
-        }
-      }, config.agentIdleTimeoutMs);
-      entry.idleTimer.unref?.();
+      this.scheduleIdleTimeout(sessionId, entry);
     }
+  }
+
+  private scheduleIdleTimeout(sessionId: string, entry: Entry) {
+    if (entry.idleTimer) return;
+    if (entry.process.status !== 'awaiting_input') {
+      // Still working — wait until the turn finishes, then start the timer.
+      const onEvent = (ev: AgentEvent) => {
+        if (ev.type !== 'output' || !ev.parsed || ev.parsed.type !== 'result') return;
+        entry.process.removeListener('event', onEvent);
+        if (entry.listeners.size === 0) this.scheduleIdleTimeout(sessionId, entry);
+      };
+      entry.process.on('event', onEvent);
+      return;
+    }
+    entry.idleTimer = setTimeout(() => {
+      const e = this.entries.get(sessionId);
+      if (e && e.listeners.size === 0) {
+        e.process.stop();
+      }
+    }, config.agentIdleTimeoutMs);
+    entry.idleTimer.unref?.();
   }
 
   get(sessionId: string): AgentProcess | undefined {
