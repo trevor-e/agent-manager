@@ -299,6 +299,19 @@ button .kbd-hint { background: transparent; border-color: rgba(88,166,255,0.25);
   background: transparent; border: 1px dashed var(--border);
   color: var(--fg2); font-style: italic;
 }
+.bubble-thinking { padding: 10px 14px; }
+.thinking-dots { display: inline-flex; gap: 4px; align-items: center; }
+.thinking-dots span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--fg2);
+  animation: thinking-bounce 1.2s infinite ease-in-out;
+}
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes thinking-bounce {
+  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
 
 .bubble-tool {
   background: var(--bg3); border: 1px solid var(--border);

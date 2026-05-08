@@ -34,6 +34,9 @@ export function Composer({
   const [connected, setConnected] = useState(false);
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(false);
+  const [working, setWorking] = useState(
+    session.derived_state === 'working' || session.derived_state === 'launching'
+  );
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
@@ -42,6 +45,10 @@ export function Composer({
   const bubbleIdCounter = useRef(0);
   const attachmentIdCounter = useRef(0);
   const esRef = useRef<EventSource | null>(null);
+  // Tracks the currently streaming assistant message id and its accumulated text,
+  // so content_block_delta events can incrementally grow the bubble.
+  const streamingMessageIdRef = useRef<string | null>(null);
+  const streamingTextRef = useRef<Map<string, string>>(new Map());
 
   const showCoexistWarning = session.is_running;
 
@@ -96,6 +103,8 @@ export function Composer({
       };
       return next;
     });
+    // Tool finished — claude is about to think about the next step.
+    setWorking(true);
   }
 
   useEffect(() => {
@@ -128,6 +137,16 @@ export function Composer({
       case 'output': {
         const p = ev.parsed;
         if (!p || typeof p !== 'object') return;
+        if (p.type === 'result') {
+          setWorking(false);
+          streamingMessageIdRef.current = null;
+          return;
+        }
+        if (p.type === 'stream_event' && p.event && typeof p.event === 'object') {
+          handleStreamEvent(p.event);
+          setWorking(true);
+          return;
+        }
         if (p.type === 'assistant' || p.type === 'message') {
           const msg = p.message;
           if (!msg || typeof msg !== 'object') return;
@@ -193,7 +212,48 @@ export function Composer({
       case 'exit':
         addBubble({ kind: 'system', text: `agent exited (code=${ev.code ?? '?'})` } as Bubble);
         setConnected(false);
+        setWorking(false);
+        streamingMessageIdRef.current = null;
         break;
+    }
+  }
+
+  function handleStreamEvent(e: any) {
+    const t = e.type;
+    if (t === 'message_start') {
+      const id = e.message?.id;
+      if (typeof id === 'string') {
+        streamingMessageIdRef.current = id;
+        streamingTextRef.current.set(id, '');
+      }
+      return;
+    }
+    if (t === 'content_block_start') {
+      const cb = e.content_block;
+      if (cb?.type === 'tool_use' && typeof cb.id === 'string' && typeof cb.name === 'string') {
+        addToolUseIfNew({
+          kind: 'tool_use',
+          toolUseId: cb.id,
+          toolName: cb.name,
+          input: cb.input ?? {},
+          status: 'pending',
+          startedAt: Date.now(),
+        });
+      }
+      return;
+    }
+    if (t === 'content_block_delta') {
+      const d = e.delta;
+      const msgId = streamingMessageIdRef.current;
+      if (d?.type === 'text_delta' && msgId && typeof d.text === 'string') {
+        const next = (streamingTextRef.current.get(msgId) ?? '') + d.text;
+        streamingTextRef.current.set(msgId, next);
+        setAssistantText(msgId, next);
+      }
+      return;
+    }
+    if (t === 'message_stop') {
+      streamingMessageIdRef.current = null;
     }
   }
 
@@ -201,7 +261,7 @@ export function Composer({
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [bubbles, approvals]);
+  }, [bubbles, approvals, working]);
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -224,6 +284,7 @@ export function Composer({
     if (pending) return;
     if (!text.trim() && imgs.length === 0) return;
     setPending(true);
+    setWorking(true);
     addBubble({
       kind: 'user',
       text,
@@ -234,6 +295,7 @@ export function Composer({
       await api.sendMessage(session.id, text, apiImages);
     } catch (e) {
       addBubble({ kind: 'system', text: `error: ${(e as Error).message}` } as Bubble);
+      setWorking(false);
     } finally {
       setPending(false);
     }
@@ -359,6 +421,7 @@ export function Composer({
           <div className="muted small pad">No messages yet — say something to wake up the agent.</div>
         )}
         {bubbles.map(b => <BubbleRow key={b.id} bubble={b} />)}
+        {working && shouldShowThinking(bubbles) && <ThinkingBubble />}
       </div>
 
       <div className="composer-quick-actions">
@@ -441,6 +504,30 @@ export function Composer({
           onResolve={(decision, opts) => resolveApprovalAction(approvals[0].approvalId, decision, opts)}
         />
       )}
+    </div>
+  );
+}
+
+function shouldShowThinking(bubbles: Bubble[]): boolean {
+  if (bubbles.length === 0) return true;
+  const last = bubbles[bubbles.length - 1];
+  if (last.kind === 'assistant') return false;
+  if (last.kind === 'tool_use' && (last.status === 'pending' || last.status === 'allowed')) {
+    return false;
+  }
+  return true;
+}
+
+function ThinkingBubble() {
+  return (
+    <div className="bubble-row bubble-row-assistant">
+      <div className="bubble bubble-assistant bubble-thinking">
+        <span className="thinking-dots" aria-label="thinking">
+          <span />
+          <span />
+          <span />
+        </span>
+      </div>
     </div>
   );
 }
