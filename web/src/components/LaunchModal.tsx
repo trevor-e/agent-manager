@@ -41,6 +41,8 @@ export function LaunchModal({
   const [model, setModel] = useState('claude-opus-4-6');
   const [effort, setEffort] = useState<EffortLevel | ''>('');
   const [addDirsText, setAddDirsText] = useState('');
+  const [systemPrompt, setSystemPrompt] = useState('');
+  const [appendSystemPrompt, setAppendSystemPrompt] = useState('');
   const [pending, setPending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -57,6 +59,8 @@ export function LaunchModal({
       .map(s => s.trim())
       .filter(Boolean);
     if (dirs.length) opts.addDirs = dirs;
+    if (systemPrompt.trim()) opts.systemPrompt = systemPrompt.trim();
+    if (appendSystemPrompt.trim()) opts.appendSystemPrompt = appendSystemPrompt.trim();
     return opts;
   }
 
@@ -150,6 +154,18 @@ export function LaunchModal({
               </select>
             </div>
           </div>
+          <label>System prompt (replaces default)</label>
+          <textarea
+            value={systemPrompt}
+            onChange={e => setSystemPrompt(e.target.value)}
+            placeholder="Custom system prompt — replaces the default entirely"
+          />
+          <label>Append to system prompt</label>
+          <textarea
+            value={appendSystemPrompt}
+            onChange={e => setAppendSystemPrompt(e.target.value)}
+            placeholder="Added after the default system prompt"
+          />
           <label>Additional allowed directories</label>
           <textarea
             value={addDirsText}

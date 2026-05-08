@@ -64,6 +64,8 @@ export const api = {
   setPermissionMode: (id: string, mode: import('./types').PermissionMode) =>
     jsend<{ ok: boolean }>(`/api/sessions/${id}/permission-mode`, 'POST', { mode }),
   stopAgent: (id: string) => jsend<{ ok: boolean }>(`/api/sessions/${id}/stop`, 'POST'),
+  forkSession: (id: string, opts?: { web_only?: boolean }) =>
+    jsend<{ ok: boolean; session_id: string }>(`/api/sessions/${id}/fork`, 'POST', opts),
 
   getGit: (id: string, mode: 'working' | 'branch') =>
     jget<{ changes: GitChanges }>(`/api/sessions/${id}/git?mode=${mode}`),

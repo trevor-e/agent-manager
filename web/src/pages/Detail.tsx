@@ -123,6 +123,16 @@ export function DetailPage({ id }: { id: string }) {
     await api.launch({ project_path: session.project_path, resume_id: session.id });
   }
 
+  async function fork() {
+    if (!session) return;
+    try {
+      const resp = await api.forkSession(session.id, { web_only: true });
+      navigate(`/sessions/${resp.session_id}`);
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  }
+
   useEffect(() => {
     if (!session) return;
     const currentId = session.id;
@@ -225,6 +235,16 @@ export function DetailPage({ id }: { id: string }) {
               </>
             )}
           </div>
+          {session.tool_usage && Object.keys(session.tool_usage).length > 0 && (
+            <div className="meta-row" style={{ gap: '4px', marginTop: '4px' }}>
+              {Object.entries(session.tool_usage)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 10)
+                .map(([name, count]) => (
+                  <span key={name} className="usage-pill">{name}: {count}</span>
+                ))}
+            </div>
+          )}
           {session.pr_url && (
             <div className="pr-row">
               <a className="pr-link pr-link-large" href={session.pr_url} target="_blank" rel="noreferrer">
@@ -246,6 +266,7 @@ export function DetailPage({ id }: { id: string }) {
             {view === 'conversation' ? 'View changes' : 'View chat'}
             <kbd className="kbd-hint">⌘B</kbd>
           </button>
+          <button onClick={fork} title="Fork this session into a new one">Fork</button>
           <button onClick={resume}>Resume in Ghostty</button>
           <button className="ghost" onClick={markDone} title="Toggle done">
             {session.user_status === 'done' ? 'Mark active' : 'Mark done'}

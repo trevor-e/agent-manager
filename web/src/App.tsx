@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { requestNotificationPermission } from './notifications';
 import { ListPage } from './pages/List';
 import { DetailPage } from './pages/Detail';
 
@@ -20,6 +21,15 @@ export function App() {
     const onChange = () => setRoute(getRoute());
     window.addEventListener('popstate', onChange);
     return () => window.removeEventListener('popstate', onChange);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      requestNotificationPermission();
+      document.removeEventListener('click', handler);
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
   }, []);
 
   return (

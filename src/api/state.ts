@@ -18,6 +18,7 @@ export type SessionView = SessionRow & {
   is_running: boolean;
   web_chat_locked: boolean;
   usage?: UsageTotals | null;
+  tool_usage?: Record<string, number> | null;
 };
 
 const RECENT_ACTIVITY_MS = 1000 * 60 * 2;

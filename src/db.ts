@@ -9,7 +9,7 @@ export const db = new Database(config.dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS schema_meta (
@@ -67,6 +67,7 @@ addColumnIfMissing('sessions', 'pr_repository', 'TEXT');
 addColumnIfMissing('sessions', 'pr_seen_at', 'INTEGER');
 addColumnIfMissing('sessions', 'launch_options', 'TEXT');
 addColumnIfMissing('running_processes', 'session_id', 'TEXT');
+addColumnIfMissing('sessions', 'parent_session_id', 'TEXT');
 
 const prevVersion = (db.prepare("SELECT value FROM schema_meta WHERE key = 'schema_version'").get() as
   | { value: string }
@@ -75,6 +76,34 @@ if (prevVersion !== String(SCHEMA_VERSION)) {
   db.prepare('UPDATE sessions SET file_mtime = NULL').run();
   db.prepare('INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)')
     .run('schema_version', String(SCHEMA_VERSION));
+}
+
+db.exec(`
+  CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
+    title, auto_title, last_prompt,
+    content=sessions, content_rowid=rowid
+  );
+
+  CREATE TRIGGER IF NOT EXISTS sessions_fts_ai AFTER INSERT ON sessions BEGIN
+    INSERT INTO sessions_fts(rowid, title, auto_title, last_prompt)
+    VALUES (new.rowid, new.title, new.auto_title, new.last_prompt);
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS sessions_fts_ad AFTER DELETE ON sessions BEGIN
+    INSERT INTO sessions_fts(sessions_fts, rowid, title, auto_title, last_prompt)
+    VALUES ('delete', old.rowid, old.title, old.auto_title, old.last_prompt);
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS sessions_fts_au AFTER UPDATE ON sessions BEGIN
+    INSERT INTO sessions_fts(sessions_fts, rowid, title, auto_title, last_prompt)
+    VALUES ('delete', old.rowid, old.title, old.auto_title, old.last_prompt);
+    INSERT INTO sessions_fts(rowid, title, auto_title, last_prompt)
+    VALUES (new.rowid, new.title, new.auto_title, new.last_prompt);
+  END;
+`);
+
+if (prevVersion !== String(SCHEMA_VERSION)) {
+  db.exec("INSERT INTO sessions_fts(sessions_fts) VALUES('rebuild')");
 }
 
 export type SessionRow = {
@@ -107,6 +136,9 @@ export type LaunchOptions = {
   model?: string;
   effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   addDirs?: string[];
+  systemPrompt?: string;
+  appendSystemPrompt?: string;
+  forkFrom?: string;
 };
 
 export type ProcessRow = {
@@ -211,6 +243,7 @@ export function getSession(id: string): SessionRow | undefined {
 export function listSessions(opts: { status?: string; repo?: string; q?: string } = {}): SessionRow[] {
   const where: string[] = [];
   const params: Record<string, unknown> = {};
+  let useFts = false;
   if (opts.status && opts.status !== 'all') {
     if (opts.status === 'active') {
       where.push("user_status = 'active'");
@@ -224,8 +257,19 @@ export function listSessions(opts: { status?: string; repo?: string; q?: string 
     params.repo = opts.repo;
   }
   if (opts.q) {
-    where.push('(title LIKE @q OR auto_title LIKE @q OR last_prompt LIKE @q)');
-    params.q = `%${opts.q}%`;
+    useFts = true;
+    params.q = opts.q;
+  }
+  if (useFts) {
+    try {
+      const ftsWhere = where.length ? 'AND ' + where.join(' AND ') : '';
+      const sql = `SELECT s.* FROM sessions s JOIN sessions_fts f ON s.rowid = f.rowid WHERE sessions_fts MATCH @q ${ftsWhere} ORDER BY s.last_event_at DESC LIMIT 1000`;
+      return db.prepare(sql).all(params) as SessionRow[];
+    } catch {
+      where.push('(title LIKE @qlike OR auto_title LIKE @qlike OR last_prompt LIKE @qlike)');
+      params.qlike = `%${opts.q}%`;
+      delete params.q;
+    }
   }
   const sql = `SELECT * FROM sessions ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY last_event_at DESC LIMIT 1000`;
   return db.prepare(sql).all(params) as SessionRow[];

@@ -22,7 +22,11 @@ export type LaunchResult = {
 
 function buildClaudeArgv(opts: LaunchOpts): string[] {
   const args = ['claude'];
-  if (opts.kind === 'new') {
+  const forkFrom = opts.launchOptions?.forkFrom;
+  if (forkFrom) {
+    args.push('--fork-session', '--resume', forkFrom, '--session-id', opts.sessionId);
+    if (opts.title) args.push('--name', opts.title);
+  } else if (opts.kind === 'new') {
     args.push('--session-id', opts.sessionId);
     if (opts.title) args.push('--name', opts.title);
   } else {
@@ -38,6 +42,8 @@ function buildClaudeArgv(opts: LaunchOpts): string[] {
       args.push('--worktree');
       if (lo.worktree.name) args.push(lo.worktree.name);
     }
+    if (lo.systemPrompt) args.push('--system-prompt', lo.systemPrompt);
+    if (lo.appendSystemPrompt) args.push('--append-system-prompt', lo.appendSystemPrompt);
   }
   return args;
 }

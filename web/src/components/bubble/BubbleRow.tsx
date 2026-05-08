@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNow } from '../../useNow';
+import { detectDanger } from '../../dangerDetect';
 import { Markdown } from '../Markdown';
 import { ToolInputView } from './ToolInputView';
 import type { Bubble, ToolUseBubble } from './types';
@@ -86,10 +87,15 @@ function ToolBubbleRow({ bubble }: { bubble: ToolUseBubble }) {
     () => summarizeInput(bubble.toolName, bubble.input),
     [bubble.toolName, bubble.input]
   );
+  const danger = useMemo(
+    () => detectDanger(bubble.toolName, bubble.input),
+    [bubble.toolName, bubble.input]
+  );
   const badge = statusBadge(bubble);
   const klass =
     'bubble-tool ' +
-    (bubble.status === 'denied' || bubble.resultIsError ? 'bubble-tool-error' : '');
+    (bubble.status === 'denied' || bubble.resultIsError ? 'bubble-tool-error' : '') +
+    (danger.dangerous ? ' bubble-tool-dangerous' : '');
   const elapsed = useToolElapsed(bubble);
   return (
     <div className="bubble-row bubble-row-tool">
@@ -102,6 +108,7 @@ function ToolBubbleRow({ bubble }: { bubble: ToolUseBubble }) {
         <span className="tool-chevron">{open ? '▾' : '▸'}</span>
         <span className="tool-status">{badge}</span>
         <span className="tool-name">{bubble.toolName}</span>
+        {danger.dangerous && <span className="tool-danger-badge" title={danger.reason}>danger</span>}
         <span className="tool-summary mono">{summary}</span>
         {elapsed && <span className="tool-elapsed mono">{elapsed}</span>}
       </button>

@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import {
+  db,
   listSessions,
   getSession,
   setUserStatus,
@@ -20,6 +21,7 @@ import {
   lockedSessionIdsExcludingOwn,
 } from '../state.ts';
 import { computeUsage } from '../../scanner/usage.ts';
+import { computeToolUsage } from '../../scanner/tools.ts';
 
 type RepoSummary = {
   repo_name: string;
@@ -75,6 +77,7 @@ export function registerSessionRoutes(app: FastifyInstance) {
     const view = toView(row, running, locked);
     if (row.jsonl_path) {
       view.usage = await computeUsage(row.jsonl_path);
+      view.tool_usage = await computeToolUsage(row.jsonl_path);
     }
     const events = row.jsonl_path && existsSync(row.jsonl_path)
       ? await readLastEvents(row.jsonl_path, 50)
@@ -155,6 +158,45 @@ export function registerSessionRoutes(app: FastifyInstance) {
     return { ok: true, session_id: id, command: result.command };
   });
 
+  app.post<{
+    Params: { id: string };
+    Body: {
+      web_only?: boolean;
+      launch_options?: LaunchOptions;
+    };
+  }>('/api/sessions/:id/fork', async (req, reply) => {
+    const parent = getSession(req.params.id);
+    if (!parent) {
+      reply.code(404);
+      return { error: 'session not found' };
+    }
+    const id = randomUUID();
+    const repoName = parent.project_path.split('/').filter(Boolean).pop() ?? parent.project_path;
+    const now = Date.now();
+    const normalized = normalizeLaunchOptions(req.body?.launch_options) ?? {};
+    normalized.forkFrom = parent.id;
+    insertLaunchPlaceholderStmt.run({
+      id,
+      project_path: parent.project_path,
+      repo_name: repoName,
+      title: `Fork of ${parent.title ?? parent.auto_title ?? parent.id.slice(0, 8)}`,
+      launch_options: JSON.stringify(normalized),
+      now,
+    });
+    db.prepare('UPDATE sessions SET parent_session_id = ? WHERE id = ?').run(parent.id, id);
+    const webOnly = req.body?.web_only !== false;
+    if (!webOnly) {
+      launchSession({
+        cwd: parent.project_path,
+        kind: 'new',
+        sessionId: id,
+        title: null,
+        launchOptions: normalized,
+      });
+    }
+    return { ok: true, session_id: id };
+  });
+
   app.post('/api/scan', async () => {
     await runScanOnce();
     return { ok: true };
@@ -186,6 +228,12 @@ function normalizeLaunchOptions(input: unknown): LaunchOptions | null {
         out.worktree.name = w.name.trim();
       }
     }
+  }
+  if (typeof src.systemPrompt === 'string' && src.systemPrompt.trim()) {
+    out.systemPrompt = src.systemPrompt.trim();
+  }
+  if (typeof src.appendSystemPrompt === 'string' && src.appendSystemPrompt.trim()) {
+    out.appendSystemPrompt = src.appendSystemPrompt.trim();
   }
   return Object.keys(out).length ? out : null;
 }

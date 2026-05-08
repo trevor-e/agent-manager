@@ -39,6 +39,7 @@ export type Session = {
   is_running: boolean;
   web_chat_locked: boolean;
   usage?: UsageTotals | null;
+  tool_usage?: Record<string, number> | null;
 };
 
 export type RepoSummary = {
@@ -87,4 +88,6 @@ export type LaunchOptions = {
   model?: string;
   effort?: EffortLevel;
   addDirs?: string[];
+  systemPrompt?: string;
+  appendSystemPrompt?: string;
 };

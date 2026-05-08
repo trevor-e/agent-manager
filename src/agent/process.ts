@@ -80,10 +80,12 @@ export class AgentProcess extends EventEmitter {
     const isNew = !existing?.jsonl_path;
     const launchOptions = parseLaunchOptions(existing?.launch_options);
 
+    const forkFrom = launchOptions?.forkFrom;
     const args = [
       '-p',
-      isNew ? '--session-id' : '--resume',
-      this.sessionId,
+      ...(forkFrom
+        ? ['--fork-session', '--resume', forkFrom, '--session-id', this.sessionId]
+        : [isNew ? '--session-id' : '--resume', this.sessionId]),
       '--input-format',
       'stream-json',
       '--output-format',
@@ -103,11 +105,13 @@ export class AgentProcess extends EventEmitter {
       args.push('--worktree');
       if (launchOptions.worktree.name) args.push(launchOptions.worktree.name);
     }
+    if (launchOptions?.systemPrompt) args.push('--system-prompt', launchOptions.systemPrompt);
+    if (launchOptions?.appendSystemPrompt) args.push('--append-system-prompt', launchOptions.appendSystemPrompt);
 
     this.child = spawn(config.claudeBin, args, {
       cwd: this.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, NPM_CONFIG_LOGLEVEL: 'error' },
+      env: { ...process.env, NPM_CONFIG_LOGLEVEL: 'error', CLAUDE_MANAGER_AGENT: '1' },
     });
 
     this.child.stdout!.setEncoding('utf8');

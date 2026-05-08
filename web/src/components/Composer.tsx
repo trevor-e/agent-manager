@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { api } from '../api';
+import { notify } from '../notifications';
 import type { Session, SessionEvent } from '../types';
 import {
   type Bubble,
@@ -188,6 +189,7 @@ export function Composer({
       }
       case 'approval_request':
         setApprovals(prev => [...prev, { approvalId: ev.approvalId, toolName: ev.toolName, input: ev.input }]);
+        notify(`Approval needed`, `${session.display_name ?? 'Session'}: ${ev.toolName}`);
         break;
       case 'approval_resolved': {
         setApprovals(prev => prev.filter(a => a.approvalId !== ev.approvalId));
@@ -214,6 +216,7 @@ export function Composer({
         setConnected(false);
         setWorking(false);
         streamingMessageIdRef.current = null;
+        notify(`Session finished`, session.display_name ?? 'Session');
         break;
     }
   }

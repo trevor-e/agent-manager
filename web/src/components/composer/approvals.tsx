@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { detectDanger } from '../../dangerDetect';
 import type { PermissionMode } from '../../types';
 import { ToolInputView } from '../Bubble';
 import { Markdown } from '../Markdown';
@@ -26,17 +27,28 @@ export function ApprovalModal({
   if (approval.toolName === 'ExitPlanMode') {
     return <ExitPlanModeModal approval={approval} onResolve={onResolve} />;
   }
+  const danger = useMemo(
+    () => detectDanger(approval.toolName, approval.input),
+    [approval.toolName, approval.input]
+  );
   return (
     <div className="modal-bg">
       <div className="modal modal-approval">
         <h3>Approve tool use?</h3>
+        {danger.dangerous && (
+          <div className="approval-danger-banner">
+            Potentially dangerous: {danger.reason}
+          </div>
+        )}
         <p className="muted small">claude wants to call: <code>{approval.toolName}</code></p>
         <div className="approval-input">
           <ToolInputView input={approval.input} toolName={approval.toolName} />
         </div>
         <div className="modal-actions">
           <button className="ghost" onClick={() => onResolve('deny')}>Deny</button>
-          <button className="primary" autoFocus onClick={() => onResolve('approve')}>Approve</button>
+          <button className={danger.dangerous ? '' : 'primary'} autoFocus={!danger.dangerous} onClick={() => onResolve('approve')}>
+            Approve
+          </button>
         </div>
       </div>
     </div>

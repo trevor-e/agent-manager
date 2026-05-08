@@ -323,6 +323,15 @@ button .kbd-hint { background: transparent; border-color: rgba(88,166,255,0.25);
 }
 .bubble-tool:hover { border-color: var(--gray); color: var(--fg); }
 .bubble-tool-error { border-color: rgba(248,81,73,0.4); }
+.bubble-tool-dangerous { border-color: rgba(248,81,73,0.5); background: rgba(248,81,73,0.06); }
+.bubble-tool-dangerous:hover { border-color: var(--red); }
+.tool-danger-badge {
+  font-size: 10px; padding: 1px 6px; border-radius: 4px;
+  background: rgba(248,81,73,0.15); color: var(--red);
+  border: 1px solid rgba(248,81,73,0.4);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  flex-shrink: 0; font-weight: 600;
+}
 .tool-chevron { color: var(--fg3); width: 12px; flex-shrink: 0; }
 .tool-status { font-family: monospace; color: var(--fg3); width: 12px; flex-shrink: 0; }
 .bubble-tool-error .tool-status { color: var(--red); }
@@ -416,6 +425,12 @@ button .kbd-hint { background: transparent; border-color: rgba(88,166,255,0.25);
 .modal-approval .tool-field-value,
 .modal-approval .tool-pre,
 .modal-approval .diff-body { max-height: none; }
+.approval-danger-banner {
+  padding: 8px 12px; border-radius: 6px;
+  background: rgba(248,81,73,0.10); color: var(--red);
+  border: 1px solid rgba(248,81,73,0.4);
+  font-size: 13px; font-weight: 500;
+}
 
 .tool-fields { display: flex; flex-direction: column; gap: 8px; }
 .tool-field { display: flex; flex-direction: column; gap: 2px; }
