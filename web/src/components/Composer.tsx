@@ -305,13 +305,13 @@ export function Composer({
         </div>
       </div>
 
-      {approvals.map(a => (
+      {approvals[0] && (
         <ApprovalModal
-          key={a.approvalId}
-          approval={a}
-          onResolve={(decision, opts) => resolveApprovalAction(a.approvalId, decision, opts)}
+          key={approvals[0].approvalId}
+          approval={approvals[0]}
+          onResolve={(decision, opts) => resolveApprovalAction(approvals[0].approvalId, decision, opts)}
         />
-      ))}
+      )}
     </div>
   );
 }
