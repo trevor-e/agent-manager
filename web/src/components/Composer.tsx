@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { api } from '../api';
-import type { PermissionMode, Session, SessionEvent } from '../types';
+import type { Session, SessionEvent } from '../types';
 import {
   type Bubble,
   type ToolUseBubble,
   type AssistantBubble,
   BubbleRow,
-  ToolInputView,
   eventsToBubbles,
 } from './Bubble';
-import { Markdown } from './Markdown';
+import { ApprovalModal, type Approval, type ResolveOpts } from './composer/approvals';
+import {
+  type Attachment,
+  processAttachmentFiles,
+} from './composer/attachments';
 
 type AgentEvent =
   | { type: 'attached'; pendingApprovals: Approval[] }
@@ -18,19 +21,6 @@ type AgentEvent =
   | { type: 'approval_resolved'; approvalId: string; decision: 'approve' | 'deny'; reason?: string }
   | { type: 'stderr'; line: string }
   | { type: 'exit'; code: number | null; signal: string | null };
-
-type Approval = { approvalId: string; toolName: string; input: any };
-
-type Attachment = {
-  id: string;
-  name: string;
-  mediaType: string;
-  base64: string;
-  dataUrl: string;
-};
-
-const MAX_ATTACHMENT_BYTES = 18 * 1024 * 1024;
-const SUPPORTED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 
 export function Composer({
   session,
@@ -261,32 +251,14 @@ export function Composer({
   }
 
   async function addFiles(files: File[]) {
-    const accepted: Attachment[] = [];
-    let errored: string | null = null;
-    for (const f of files) {
-      if (!SUPPORTED_IMAGE_TYPES.has(f.type)) {
-        errored = `unsupported file type: ${f.type || f.name}`;
-        continue;
-      }
-      if (f.size > MAX_ATTACHMENT_BYTES) {
-        errored = `${f.name} is too large (max ${(MAX_ATTACHMENT_BYTES / (1024 * 1024)).toFixed(0)}MB)`;
-        continue;
-      }
-      try {
-        const { base64, dataUrl } = await fileToBase64(f);
-        accepted.push({
-          id: `A${++attachmentIdCounter.current}`,
-          name: f.name || 'image',
-          mediaType: f.type,
-          base64,
-          dataUrl,
-        });
-      } catch (e) {
-        errored = `failed to read ${f.name}`;
-      }
+    const { accepted, error } = await processAttachmentFiles(files);
+    if (accepted.length) {
+      setAttachments(prev => [
+        ...prev,
+        ...accepted.map(a => ({ ...a, id: `A${++attachmentIdCounter.current}` })),
+      ]);
     }
-    if (accepted.length) setAttachments(prev => [...prev, ...accepted]);
-    setAttachError(errored);
+    setAttachError(error);
   }
 
   function removeAttachment(id: string) {
@@ -314,7 +286,7 @@ export function Composer({
   async function resolveApprovalAction(
     approvalId: string,
     decision: 'approve' | 'deny',
-    opts: { reason?: string; updatedInput?: unknown; nextPermissionMode?: PermissionMode } = {}
+    opts: ResolveOpts = {}
   ) {
     try {
       await api.resolveApproval(session.id, approvalId, decision, {
@@ -473,20 +445,6 @@ export function Composer({
   );
 }
 
-function fileToBase64(file: File): Promise<{ base64: string; dataUrl: string }> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error('read failed'));
-    reader.onload = () => {
-      const dataUrl = String(reader.result ?? '');
-      const comma = dataUrl.indexOf(',');
-      const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : '';
-      resolve({ base64, dataUrl });
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
 function extractToolResultText(content: any): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
@@ -501,170 +459,4 @@ function extractToolResultText(content: any): string {
       .join('\n');
   }
   return '';
-}
-
-function ApprovalModal({
-  approval,
-  onResolve,
-}: {
-  approval: Approval;
-  onResolve: (
-    decision: 'approve' | 'deny',
-    opts?: { reason?: string; updatedInput?: unknown; nextPermissionMode?: PermissionMode }
-  ) => void;
-}) {
-  if (approval.toolName === 'AskUserQuestion') {
-    return <AskUserQuestionModal approval={approval} onResolve={onResolve} />;
-  }
-  if (approval.toolName === 'ExitPlanMode') {
-    return <ExitPlanModeModal approval={approval} onResolve={onResolve} />;
-  }
-  return (
-    <div className="modal-bg">
-      <div className="modal modal-approval">
-        <h3>Approve tool use?</h3>
-        <p className="muted small">claude wants to call: <code>{approval.toolName}</code></p>
-        <div className="approval-input">
-          <ToolInputView input={approval.input} toolName={approval.toolName} />
-        </div>
-        <div className="modal-actions">
-          <button className="ghost" onClick={() => onResolve('deny')}>Deny</button>
-          <button className="primary" autoFocus onClick={() => onResolve('approve')}>Approve</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ExitPlanModeModal({
-  approval,
-  onResolve,
-}: {
-  approval: Approval;
-  onResolve: (
-    decision: 'approve' | 'deny',
-    opts?: { reason?: string; updatedInput?: unknown; nextPermissionMode?: PermissionMode }
-  ) => void;
-}) {
-  const plan = (approval.input?.plan as string | undefined) ?? '';
-  const accept = (mode: PermissionMode) => onResolve('approve', { nextPermissionMode: mode });
-  return (
-    <div className="modal-bg">
-      <div className="modal modal-approval modal-plan">
-        <h3>Plan ready — accept it?</h3>
-        <p className="muted small">
-          claude finished planning. Pick a mode to drop into when you accept.
-        </p>
-        <div className="plan-body">
-          {plan ? <Markdown>{plan}</Markdown> : <em className="muted">(empty plan)</em>}
-        </div>
-        <div className="modal-actions plan-actions">
-          <button className="ghost" onClick={() => onResolve('deny', { reason: 'keep planning' })}>
-            Keep planning
-          </button>
-          <button onClick={() => accept('default')} title="Accept the plan and ask before each tool">
-            Accept → default
-          </button>
-          <button onClick={() => accept('acceptEdits')} title="Accept the plan and auto-approve edits (still ask for shell etc.)">
-            Accept → accept edits
-          </button>
-          <button className="primary" autoFocus onClick={() => accept('bypassPermissions')} title="Accept the plan and auto-approve everything">
-            Accept → bypass
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type AskUserQuestionInput = {
-  questions?: Array<{
-    question: string;
-    header?: string;
-    multiSelect?: boolean;
-    options?: Array<{ label: string; description?: string }>;
-  }>;
-};
-
-function AskUserQuestionModal({
-  approval,
-  onResolve,
-}: {
-  approval: Approval;
-  onResolve: (
-    decision: 'approve' | 'deny',
-    opts?: { reason?: string; updatedInput?: unknown }
-  ) => void;
-}) {
-  const input = (approval.input ?? {}) as AskUserQuestionInput;
-  const questions = input.questions ?? [];
-  const [selections, setSelections] = useState<Record<string, string[]>>(() => {
-    const init: Record<string, string[]> = {};
-    for (const q of questions) init[q.question] = [];
-    return init;
-  });
-
-  function toggle(q: { question: string; multiSelect?: boolean }, label: string) {
-    setSelections(prev => {
-      const cur = prev[q.question] ?? [];
-      if (q.multiSelect) {
-        return {
-          ...prev,
-          [q.question]: cur.includes(label) ? cur.filter(l => l !== label) : [...cur, label],
-        };
-      }
-      return { ...prev, [q.question]: [label] };
-    });
-  }
-
-  function submit() {
-    const answers: Record<string, string> = {};
-    for (const q of questions) {
-      answers[q.question] = (selections[q.question] ?? []).join(', ');
-    }
-    onResolve('approve', { updatedInput: { ...input, answers } });
-  }
-
-  const allAnswered = questions.every(q => (selections[q.question] ?? []).length > 0);
-
-  return (
-    <div className="modal-bg">
-      <div className="modal modal-question">
-        <h3>claude is asking you something</h3>
-        {questions.map((q, qi) => (
-          <div key={qi} className="question-block">
-            {q.header && <div className="question-header">{q.header}</div>}
-            <div className="question-prompt">{q.question}</div>
-            <div className="question-options">
-              {(q.options ?? []).map((opt, oi) => {
-                const selected = (selections[q.question] ?? []).includes(opt.label);
-                return (
-                  <button
-                    key={oi}
-                    type="button"
-                    className={'question-option ' + (selected ? 'question-option-selected' : '')}
-                    onClick={() => toggle(q, opt.label)}
-                  >
-                    <div className="question-option-label">{opt.label}</div>
-                    {opt.description && (
-                      <div className="question-option-desc muted small">{opt.description}</div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            {q.multiSelect && (
-              <div className="muted small">multi-select — choose any</div>
-            )}
-          </div>
-        ))}
-        <div className="modal-actions">
-          <button className="ghost" onClick={() => onResolve('deny')}>Skip</button>
-          <button className="primary" disabled={!allAnswered} onClick={submit}>
-            Submit answers
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
