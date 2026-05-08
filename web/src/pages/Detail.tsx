@@ -279,7 +279,7 @@ export function DetailPage({ id }: { id: string }) {
             {view === 'conversation' ? 'View changes' : 'View chat'}
             <kbd className="kbd-hint">⌘B</kbd>
           </button>
-          <button onClick={fork} title="Fork this session into a new one (⇧⌘F)">Fork</button>
+          <button onClick={fork} title="Fork this session into a new one">Fork<kbd className="kbd-hint">⇧⌘F</kbd></button>
           <button onClick={resume}>Resume in Ghostty</button>
           <button className="ghost" onClick={markDone} title="Toggle done">
             {session.user_status === 'done' ? 'Mark active' : 'Mark done'}
