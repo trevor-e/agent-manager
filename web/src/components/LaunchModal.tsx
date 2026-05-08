@@ -38,7 +38,7 @@ export function LaunchModal({
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('auto');
   const [worktreeEnabled, setWorktreeEnabled] = useState(false);
   const [worktreeName, setWorktreeName] = useState('');
-  const [model, setModel] = useState('');
+  const [model, setModel] = useState('claude-opus-4-6');
   const [effort, setEffort] = useState<EffortLevel | ''>('');
   const [addDirsText, setAddDirsText] = useState('');
   const [pending, setPending] = useState(false);
