@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import 'highlight.js/styles/github-dark.css';
 import './styles.css';
 
 function postLog(body: { level: string; msg: string; stack?: string; url?: string }) {

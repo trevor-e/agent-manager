@@ -327,7 +327,7 @@ function ApprovalModal({
         <h3>Approve tool use?</h3>
         <p className="muted small">claude wants to call: <code>{approval.toolName}</code></p>
         <div className="approval-input">
-          <ToolInputView input={approval.input} />
+          <ToolInputView input={approval.input} toolName={approval.toolName} />
         </div>
         <div className="modal-actions">
           <button className="ghost" onClick={() => onResolve('deny')}>Deny</button>

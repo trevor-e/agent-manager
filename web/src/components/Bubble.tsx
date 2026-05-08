@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNow } from '../useNow';
+import { Markdown } from './Markdown';
+import { UnifiedDiff, AdditionsView } from './UnifiedDiff';
 
 export type AssistantBubble = { kind: 'assistant'; id: string; messageId: string; text: string };
 export type UserBubble = { kind: 'user'; id: string; text: string };
@@ -220,7 +222,9 @@ export function BubbleRow({ bubble }: { bubble: Bubble }) {
   if (bubble.kind === 'assistant') {
     return (
       <div className="bubble-row bubble-row-assistant">
-        <div className="bubble bubble-assistant">{bubble.text || <span className="muted">…</span>}</div>
+        <div className="bubble bubble-assistant">
+          {bubble.text ? <Markdown>{bubble.text}</Markdown> : <span className="muted">…</span>}
+        </div>
       </div>
     );
   }
@@ -260,13 +264,21 @@ function ToolBubbleRow({ bubble }: { bubble: ToolUseBubble }) {
       {open && (
         <div className="tool-details mono small">
           <div className="tool-section-label">input</div>
-          <ToolInputView input={bubble.input} />
+          <ToolInputView input={bubble.input} toolName={bubble.toolName} />
           {bubble.result !== undefined && (
             <>
               <div className="tool-section-label">{bubble.resultIsError ? 'error' : 'result'}</div>
-              <pre className={'tool-pre ' + (bubble.resultIsError ? 'tool-pre-error' : '')}>
-                {bubble.result.length > 8000 ? bubble.result.slice(0, 8000) + '…' : bubble.result}
-              </pre>
+              {bubble.resultIsError ? (
+                <pre className="tool-pre tool-pre-error">
+                  {bubble.result.length > 8000 ? bubble.result.slice(0, 8000) + '…' : bubble.result}
+                </pre>
+              ) : (
+                <div className="tool-result-md">
+                  <Markdown>
+                    {bubble.result.length > 8000 ? bubble.result.slice(0, 8000) + '…' : bubble.result}
+                  </Markdown>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -286,13 +298,39 @@ function prettyJson(v: unknown): string {
 
 // Renders tool input as a list of label/value pairs.
 // String values render literally (newlines preserved). Non-strings get JSON.
-export function ToolInputView({ input }: { input: any }) {
+// For Edit/Write tools, the diff/content is rendered with a unified-diff view.
+export function ToolInputView({ input, toolName }: { input: any; toolName?: string }) {
   if (input === null || input === undefined) {
     return <pre className="tool-pre muted">(no input)</pre>;
   }
   if (typeof input !== 'object' || Array.isArray(input)) {
     return <pre className="tool-pre">{prettyJson(input)}</pre>;
   }
+
+  if (toolName === 'Edit' && typeof input.old_string === 'string' && typeof input.new_string === 'string') {
+    return (
+      <div className="tool-fields">
+        <UnifiedDiff
+          oldText={input.old_string}
+          newText={input.new_string}
+          filePath={typeof input.file_path === 'string' ? input.file_path : undefined}
+        />
+        {input.replace_all && <div className="muted small">replace_all: true</div>}
+      </div>
+    );
+  }
+
+  if (toolName === 'Write' && typeof input.content === 'string') {
+    return (
+      <div className="tool-fields">
+        <AdditionsView
+          content={input.content}
+          filePath={typeof input.file_path === 'string' ? input.file_path : undefined}
+        />
+      </div>
+    );
+  }
+
   const entries = Object.entries(input);
   if (entries.length === 0) {
     return <pre className="tool-pre muted">(empty)</pre>;
