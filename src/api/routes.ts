@@ -7,7 +7,6 @@ import {
   getSession,
   setUserStatus,
   setTitle,
-  setNotes,
   insertLaunchPlaceholderStmt,
   db,
 } from '../db.ts';
@@ -22,6 +21,7 @@ import {
 } from './state.ts';
 import { agentManager } from '../agent/manager.ts';
 import type { AgentEvent } from '../agent/process.ts';
+import { log, type LogLevel } from '../log.ts';
 
 type RepoSummary = {
   repo_name: string;
@@ -72,17 +72,16 @@ export function registerRoutes(app: FastifyInstance) {
 
   app.patch<{
     Params: { id: string };
-    Body: { user_status?: 'active' | 'done' | 'archived'; title?: string | null; notes?: string | null };
+    Body: { user_status?: 'active' | 'done' | 'archived'; title?: string | null };
   }>('/api/sessions/:id', async (req, reply) => {
     const row = getSession(req.params.id);
     if (!row) {
       reply.code(404);
       return { error: 'not found' };
     }
-    const { user_status, title, notes } = req.body ?? {};
+    const { user_status, title } = req.body ?? {};
     if (user_status) setUserStatus(req.params.id, user_status);
     if (title !== undefined) setTitle(req.params.id, title);
-    if (notes !== undefined) setNotes(req.params.id, notes);
     const updated = getSession(req.params.id)!;
     return { session: toView(updated, runningCwdsExcludingOwn(), lockedSessionIdsExcludingOwn()) };
   });
@@ -138,6 +137,18 @@ export function registerRoutes(app: FastifyInstance) {
   });
 
   app.get('/api/health', async () => ({ ok: true }));
+
+  app.post<{ Body: { level?: LogLevel; msg?: string; stack?: string; url?: string } }>(
+    '/api/log',
+    async (req, reply) => {
+      const { level = 'error', msg = '(empty)', stack, url } = req.body ?? {};
+      log(level, 'web', String(msg).slice(0, 4000), {
+        stack: stack ? String(stack).slice(0, 8000) : undefined,
+        url,
+      });
+      reply.code(204).send();
+    }
+  );
 
   // ---- Agent (web chat) endpoints ----
 

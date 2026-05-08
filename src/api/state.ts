@@ -6,6 +6,7 @@ export type DerivedState =
   | 'launching'
   | 'working'
   | 'waiting'
+  | 'blocked'
   | 'idle'
   | 'done'
   | 'archived';
@@ -23,6 +24,12 @@ export function deriveState(s: SessionRow, runningCwds: Set<string>): DerivedSta
   if (s.user_status === 'archived') return 'archived';
   if (s.user_status === 'done') return 'done';
   if (s.last_event_type === 'launching') return 'launching';
+
+  // Live web-chat agents know their own state — prefer it over JSONL inference.
+  const agentStatus = agentManager.statusFor(s.id);
+  if (agentStatus === 'awaiting_approval') return 'blocked';
+  if (agentStatus === 'working') return 'working';
+  if (agentStatus === 'awaiting_input') return 'waiting';
 
   const ageMs = Date.now() - s.last_event_at;
   const cwdHasClaude = runningCwds.has(s.project_path);

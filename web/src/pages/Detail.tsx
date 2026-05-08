@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Composer } from '../components/Composer';
 import { LaunchModal } from '../components/LaunchModal';
@@ -8,6 +8,7 @@ const STATE_LABELS: Record<string, string> = {
   launching: '🚀 launching',
   working: '🟢 working',
   waiting: '🟡 waiting on you',
+  blocked: '🔴 needs approval',
   idle: '⚪ idle',
   stale: '🌫 stale',
   done: '✅ done',
@@ -27,19 +28,13 @@ export function DetailPage({ id }: { id: string }) {
   const [err, setErr] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
-  const [notesDraft, setNotesDraft] = useState('');
   const [launchOpen, setLaunchOpen] = useState(false);
   const [repos, setRepos] = useState<RepoSummary[]>([]);
-  const notesSavedRef = useRef('');
 
   async function refresh() {
     try {
       const r = await api.getSession(id);
       setData(r);
-      if (notesSavedRef.current === '') {
-        notesSavedRef.current = r.session.notes ?? '';
-        setNotesDraft(r.session.notes ?? '');
-      }
       setErr(null);
     } catch (e) {
       setErr((e as Error).message);
@@ -61,9 +56,8 @@ export function DetailPage({ id }: { id: string }) {
   if (!data) return <div className="muted pad">loading…</div>;
   const { session, events } = data;
 
-  async function save(field: 'title' | 'notes', value: string | null) {
-    await api.patchSession(id, { [field]: value });
-    if (field === 'notes') notesSavedRef.current = value ?? '';
+  async function saveTitle(value: string | null) {
+    await api.patchSession(id, { title: value });
     refresh();
   }
 
@@ -90,13 +84,13 @@ export function DetailPage({ id }: { id: string }) {
               value={titleDraft}
               onChange={e => setTitleDraft(e.target.value)}
               onBlur={async () => {
-                await save('title', titleDraft.trim() || null);
+                await saveTitle(titleDraft.trim() || null);
                 setEditing(false);
               }}
               onKeyDown={async e => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  await save('title', titleDraft.trim() || null);
+                  await saveTitle(titleDraft.trim() || null);
                   setEditing(false);
                 } else if (e.key === 'Escape') {
                   setEditing(false);
@@ -150,18 +144,6 @@ export function DetailPage({ id }: { id: string }) {
 
       <div className="detail-body">
         <Composer key={session.id} session={session} initialEvents={events} />
-        <aside className="side">
-          <h3 className="muted small">Notes</h3>
-          <textarea
-            value={notesDraft}
-            onChange={e => setNotesDraft(e.target.value)}
-            onBlur={() => {
-              if (notesDraft !== notesSavedRef.current) save('notes', notesDraft || null);
-            }}
-            placeholder="things to remember about this session…"
-            rows={10}
-          />
-        </aside>
       </div>
 
       {launchOpen && (

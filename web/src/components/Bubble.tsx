@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 export type AssistantBubble = { kind: 'assistant'; id: string; messageId: string; text: string };
 export type UserBubble = { kind: 'user'; id: string; text: string };
@@ -11,6 +11,8 @@ export type ToolUseBubble = {
   status: 'pending' | 'allowed' | 'denied' | 'completed';
   result?: string;
   resultIsError?: boolean;
+  startedAt?: number;
+  endedAt?: number;
 };
 export type SystemBubble = { kind: 'system'; id: string; text: string };
 
@@ -40,6 +42,7 @@ export function eventsToBubbles(events: any[]): Bubble[] {
     const t = ev.type as string | undefined;
     if (!t || META_TYPES.has(t)) continue;
 
+    const eventTs = parseEventTs(ev.timestamp);
     const msg = ev.message;
     if (t === 'user' && msg && typeof msg === 'object') {
       const content = msg.content;
@@ -58,6 +61,7 @@ export function eventsToBubbles(events: any[]): Bubble[] {
               tool.result = resultText;
               tool.resultIsError = !!c.is_error;
               tool.status = 'completed';
+              if (eventTs !== null) tool.endedAt = eventTs;
             }
           }
         }
@@ -90,6 +94,7 @@ export function eventsToBubbles(events: any[]): Bubble[] {
               toolName: c.name,
               input: c.input,
               status: 'allowed',
+              startedAt: eventTs ?? undefined,
             };
             // First push any accumulated text as an assistant bubble before the tool.
             if (textParts.length) {
@@ -123,6 +128,37 @@ export function eventsToBubbles(events: any[]): Bubble[] {
   }
 
   return bubbles;
+}
+
+function formatElapsed(ms: number): string {
+  if (ms < 0) ms = 0;
+  if (ms < 10_000) return `${(ms / 1000).toFixed(1)}s`;
+  const totalSec = Math.floor(ms / 1000);
+  if (totalSec < 60) return `${totalSec}s`;
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min < 60) return `${min}m${sec.toString().padStart(2, '0')}s`;
+  const hr = Math.floor(min / 60);
+  return `${hr}h${(min % 60).toString().padStart(2, '0')}m`;
+}
+
+function useToolElapsed(bubble: ToolUseBubble): string | null {
+  const inFlight = bubble.endedAt === undefined && bubble.status !== 'denied';
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!inFlight || bubble.startedAt === undefined) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [inFlight, bubble.startedAt]);
+  if (bubble.startedAt === undefined) return null;
+  const end = bubble.endedAt ?? now;
+  return formatElapsed(end - bubble.startedAt);
+}
+
+function parseEventTs(ts: unknown): number | null {
+  if (typeof ts !== 'string') return null;
+  const ms = Date.parse(ts);
+  return Number.isFinite(ms) ? ms : null;
 }
 
 function cleanUserPrompt(raw: string): string {
@@ -211,6 +247,7 @@ function ToolBubbleRow({ bubble }: { bubble: ToolUseBubble }) {
   const klass =
     'bubble-tool ' +
     (bubble.status === 'denied' || bubble.resultIsError ? 'bubble-tool-error' : '');
+  const elapsed = useToolElapsed(bubble);
   return (
     <div className="bubble-row bubble-row-tool">
       <button
@@ -223,6 +260,7 @@ function ToolBubbleRow({ bubble }: { bubble: ToolUseBubble }) {
         <span className="tool-status">{badge}</span>
         <span className="tool-name">{bubble.toolName}</span>
         <span className="tool-summary mono">{summary}</span>
+        {elapsed && <span className="tool-elapsed mono">{elapsed}</span>}
       </button>
       {open && (
         <div className="tool-details mono small">

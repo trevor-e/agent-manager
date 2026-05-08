@@ -8,6 +8,7 @@ const STATE_BADGES: Record<string, { label: string; cls: string }> = {
   launching: { label: 'launching', cls: 'badge badge-launching' },
   working: { label: 'working', cls: 'badge badge-working' },
   waiting: { label: 'waiting', cls: 'badge badge-waiting' },
+  blocked: { label: 'blocked', cls: 'badge badge-blocked' },
   idle: { label: 'idle', cls: 'badge badge-idle' },
   done: { label: 'done', cls: 'badge badge-done' },
   archived: { label: 'archived', cls: 'badge badge-archived' },

@@ -6,8 +6,35 @@ import { config } from './config.ts';
 import { registerRoutes } from './api/routes.ts';
 import { startScanner, stopScanner } from './scanner/index.ts';
 import { agentManager } from './agent/manager.ts';
+import { log, logPathResolved } from './log.ts';
+
+process.on('uncaughtException', err => {
+  log('error', 'process', 'uncaughtException', { message: err.message, stack: err.stack });
+  process.exit(1);
+});
+process.on('unhandledRejection', reason => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  log('error', 'process', 'unhandledRejection', { message: err.message, stack: err.stack });
+});
 
 const app = Fastify({ logger: false });
+
+app.addHook('onResponse', async (req, reply) => {
+  if (!req.url.startsWith('/api/')) return;
+  if (req.url === '/api/log') return;
+  const level = reply.statusCode >= 500 ? 'error' : reply.statusCode >= 400 ? 'warn' : 'info';
+  log(level, 'http', `${req.method} ${req.url} -> ${reply.statusCode}`, {
+    ms: Math.round(reply.elapsedTime),
+  });
+});
+
+app.setErrorHandler((err, req, reply) => {
+  log('error', 'http', `${req.method} ${req.url} threw`, {
+    message: err.message,
+    stack: err.stack,
+  });
+  if (!reply.sent) reply.code(500).send({ error: err.message });
+});
 
 registerRoutes(app);
 
@@ -32,13 +59,13 @@ if (existsSync(distDir)) {
 }
 
 app.listen({ port: config.port, host: '127.0.0.1' }).then(() => {
-  process.stdout.write(`claude-manager listening at http://localhost:${config.port}\n`);
-  process.stdout.write(`scanning ${config.projectsDir} every ${config.scanIntervalMs}ms\n`);
+  log('info', 'server', `listening at http://localhost:${config.port}`, { logFile: logPathResolved });
+  log('info', 'server', `scanning ${config.projectsDir} every ${config.scanIntervalMs}ms`);
   startScanner();
 });
 
 const shutdown = (sig: string) => {
-  process.stdout.write(`\nreceived ${sig}, shutting down\n`);
+  log('info', 'server', `received ${sig}, shutting down`);
   stopScanner();
   agentManager.stopAll();
   app.close().finally(() => process.exit(0));

@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events';
 import { existsSync } from 'node:fs';
 import { config } from '../config.ts';
 import { db, getSession } from '../db.ts';
+import { log } from '../log.ts';
 import type {
   ControlRequestEnvelope,
   ControlResponseEnvelope,
@@ -30,6 +31,8 @@ type PendingApproval = {
   createdAt: number;
 };
 
+export type AgentStatus = 'working' | 'awaiting_input' | 'awaiting_approval';
+
 export type AgentEvent =
   | { type: 'output'; line: string; parsed: IncomingMessage | null }
   | { type: 'approval_request'; approvalId: string; toolName: string; input: unknown }
@@ -46,6 +49,7 @@ export class AgentProcess extends EventEmitter {
   private stderrBuffer = '';
   private pendingApprovals = new Map<string, PendingApproval>();
   private exited = false;
+  private turnStatus: 'working' | 'awaiting_input' = 'awaiting_input';
 
   constructor(opts: { sessionId: string; cwd: string }) {
     super();
@@ -91,7 +95,11 @@ export class AgentProcess extends EventEmitter {
     this.child.stdout!.on('data', chunk => this.onStdoutChunk(String(chunk)));
     this.child.stderr!.on('data', chunk => this.onStderrChunk(String(chunk)));
     this.child.on('exit', (code, signal) => this.onExit(code, signal));
-    this.child.on('error', err => this.emit('error', err));
+    this.child.on('error', err => {
+      log('error', `agent:${this.sessionId}`, 'child error', { message: err.message, stack: err.stack });
+      this.emit('error', err);
+    });
+    log('info', `agent:${this.sessionId}`, 'spawned', { pid: this.child.pid, cwd: this.cwd, isNew });
 
     void this.sendInitialize();
   }
@@ -122,6 +130,12 @@ export class AgentProcess extends EventEmitter {
       message: { role: 'user', content },
     };
     this.writeLine(JSON.stringify(msg));
+    this.turnStatus = 'working';
+  }
+
+  get status(): AgentStatus {
+    if (this.pendingApprovals.size > 0) return 'awaiting_approval';
+    return this.turnStatus;
   }
 
   async setPermissionMode(mode: PermissionMode) {
@@ -211,7 +225,10 @@ export class AgentProcess extends EventEmitter {
     while (nl !== -1) {
       const line = this.stderrBuffer.slice(0, nl).trim();
       this.stderrBuffer = this.stderrBuffer.slice(nl + 1);
-      if (line) this.emit('event', { type: 'stderr', line } as AgentEvent);
+      if (line) {
+        log('warn', `agent:${this.sessionId}`, line);
+        this.emit('event', { type: 'stderr', line } as AgentEvent);
+      }
       nl = this.stderrBuffer.indexOf('\n');
     }
   }
@@ -225,6 +242,10 @@ export class AgentProcess extends EventEmitter {
     }
 
     this.emit('event', { type: 'output', line, parsed } as AgentEvent);
+
+    if (parsed?.type === 'result') {
+      this.turnStatus = 'awaiting_input';
+    }
 
     if (!parsed || parsed.type !== 'control_request') return;
     const req = parsed.request as { subtype: string; [k: string]: unknown };
@@ -319,6 +340,7 @@ export class AgentProcess extends EventEmitter {
 
   private onExit(code: number | null, signal: NodeJS.Signals | null) {
     this.exited = true;
+    log('info', `agent:${this.sessionId}`, 'exited', { code, signal });
     for (const pending of this.pendingApprovals.values()) {
       pending.resolve({
         behavior: 'deny',

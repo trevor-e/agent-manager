@@ -28,7 +28,7 @@ export const api = {
     return jget<{ sessions: Session[] }>(`/api/sessions?${qs.toString()}`);
   },
   getSession: (id: string) => jget<{ session: Session; events: SessionEvent[] }>(`/api/sessions/${id}`),
-  patchSession: (id: string, body: Partial<{ user_status: 'active' | 'done' | 'archived'; title: string | null; notes: string | null }>) =>
+  patchSession: (id: string, body: Partial<{ user_status: 'active' | 'done' | 'archived'; title: string | null }>) =>
     jsend<{ session: Session }>(`/api/sessions/${id}`, 'PATCH', body),
   launch: (body: { project_path: string; resume_id?: string; title?: string; web_only?: boolean }) =>
     jsend<{ ok: boolean; session_id: string }>('/api/sessions/launch', 'POST', body),

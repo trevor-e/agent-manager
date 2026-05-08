@@ -1,4 +1,4 @@
-import { AgentProcess, type AgentEvent } from './process.ts';
+import { AgentProcess, type AgentEvent, type AgentStatus } from './process.ts';
 import { config } from '../config.ts';
 
 type Entry = {
@@ -62,6 +62,12 @@ class AgentManager {
 
   has(sessionId: string) {
     return this.entries.has(sessionId);
+  }
+
+  statusFor(sessionId: string): AgentStatus | undefined {
+    const entry = this.entries.get(sessionId);
+    if (!entry || !entry.process.isAlive()) return undefined;
+    return entry.process.status;
   }
 
   ownedPids(): Set<number> {

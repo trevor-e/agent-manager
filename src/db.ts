@@ -33,7 +33,6 @@ db.exec(`
     file_mtime      INTEGER,
     file_size       INTEGER,
     user_status     TEXT NOT NULL DEFAULT 'active',
-    notes           TEXT,
     pr_url          TEXT,
     pr_number       INTEGER,
     pr_repository   TEXT,
@@ -93,7 +92,6 @@ export type SessionRow = {
   file_mtime: number | null;
   file_size: number | null;
   user_status: 'active' | 'done' | 'archived';
-  notes: string | null;
   pr_url: string | null;
   pr_number: number | null;
   pr_repository: string | null;

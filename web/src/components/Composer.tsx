@@ -80,7 +80,13 @@ export function Composer({
       if (idx === -1) return prev;
       const cur = prev[idx] as ToolUseBubble;
       const next = [...prev];
-      next[idx] = { ...cur, result, resultIsError: isError, status: 'completed' };
+      next[idx] = {
+        ...cur,
+        result,
+        resultIsError: isError,
+        status: 'completed',
+        endedAt: cur.endedAt ?? Date.now(),
+      };
       return next;
     });
   }
@@ -110,7 +116,7 @@ export function Composer({
   function handleEvent(ev: AgentEvent) {
     switch (ev.type) {
       case 'attached':
-        if (ev.pendingApprovals?.length) setApprovals(ev.pendingApprovals);
+        setApprovals(ev.pendingApprovals ?? []);
         break;
       case 'output': {
         const p = ev.parsed;
@@ -136,6 +142,7 @@ export function Composer({
                   toolName: c.name,
                   input: c.input,
                   status: 'pending',
+                  startedAt: Date.now(),
                 });
               }
             }
@@ -164,7 +171,11 @@ export function Composer({
           const realIdx = prev.length - 1 - idx;
           const cur = prev[realIdx] as ToolUseBubble;
           const next = [...prev];
-          next[realIdx] = { ...cur, status: ev.decision === 'approve' ? 'allowed' : 'denied' };
+          next[realIdx] = {
+            ...cur,
+            status: ev.decision === 'approve' ? 'allowed' : 'denied',
+            endedAt: ev.decision === 'deny' ? Date.now() : cur.endedAt,
+          };
           return next;
         });
         break;
@@ -205,7 +216,15 @@ export function Composer({
     decision: 'approve' | 'deny',
     opts: { reason?: string; updatedInput?: unknown } = {}
   ) {
-    await api.resolveApproval(session.id, approvalId, decision, opts);
+    try {
+      await api.resolveApproval(session.id, approvalId, decision, opts);
+    } catch (e) {
+      setApprovals(prev => prev.filter(a => a.approvalId !== approvalId));
+      addBubble({
+        kind: 'system',
+        text: `approval was no longer valid (${(e as Error).message}); the agent likely restarted`,
+      } as Bubble);
+    }
   }
 
   async function interrupt() {
@@ -312,7 +331,7 @@ function ApprovalModal({
         </div>
         <div className="modal-actions">
           <button className="ghost" onClick={() => onResolve('deny')}>Deny</button>
-          <button className="primary" onClick={() => onResolve('approve')}>Approve</button>
+          <button className="primary" autoFocus onClick={() => onResolve('approve')}>Approve</button>
         </div>
       </div>
     </div>

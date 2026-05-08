@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm run build:web && concurrently -n web,server -c blue,green \"vite build --watch\" \"tsx watch src/server.ts\"",
+    "dev": "pnpm run build:web && concurrently -n web,server -c blue,green \"vite build --watch\" \"tsx src/server.ts\"",
     "dev:web": "vite",
     "dev:server": "tsx watch src/server.ts",
     "build:web": "vite build",

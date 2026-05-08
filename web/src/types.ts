@@ -2,6 +2,7 @@ export type DerivedState =
   | 'launching'
   | 'working'
   | 'waiting'
+  | 'blocked'
   | 'idle'
   | 'done'
   | 'archived';
@@ -20,7 +21,6 @@ export type Session = {
   last_event_type: string | null;
   last_prompt: string | null;
   user_status: 'active' | 'done' | 'archived';
-  notes: string | null;
   pr_url: string | null;
   pr_number: number | null;
   pr_repository: string | null;
