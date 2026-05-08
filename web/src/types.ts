@@ -49,3 +49,42 @@ export type RepoSummary = {
 };
 
 export type SessionEvent = Record<string, unknown> & { type?: string };
+
+export type FileChange = {
+  path: string;
+  oldPath: string | null;
+  status: 'M' | 'A' | 'D' | 'R' | 'C' | 'T' | 'U' | '??';
+  additions: number;
+  deletions: number;
+  binary: boolean;
+  diff: string;
+  truncated: boolean;
+};
+
+export type GitChanges = {
+  isRepo: boolean;
+  mode: 'working' | 'branch';
+  branch: string | null;
+  baseRef: string | null;
+  ahead: number;
+  files: FileChange[];
+  warning?: string;
+};
+
+export type PermissionMode =
+  | 'default'
+  | 'acceptEdits'
+  | 'plan'
+  | 'bypassPermissions'
+  | 'auto'
+  | 'dontAsk';
+
+export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+export type LaunchOptions = {
+  permissionMode?: PermissionMode;
+  worktree?: { enabled: boolean; name?: string };
+  model?: string;
+  effort?: EffortLevel;
+  addDirs?: string[];
+};

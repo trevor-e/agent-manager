@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import type { Session, SessionEvent } from '../types';
+import type { PermissionMode, Session, SessionEvent } from '../types';
 import {
   type Bubble,
   type ToolUseBubble,
@@ -9,6 +9,7 @@ import {
   ToolInputView,
   eventsToBubbles,
 } from './Bubble';
+import { Markdown } from './Markdown';
 
 type AgentEvent =
   | { type: 'attached'; pendingApprovals: Approval[] }
@@ -224,10 +225,23 @@ export function Composer({
   async function resolveApprovalAction(
     approvalId: string,
     decision: 'approve' | 'deny',
-    opts: { reason?: string; updatedInput?: unknown } = {}
+    opts: { reason?: string; updatedInput?: unknown; nextPermissionMode?: PermissionMode } = {}
   ) {
     try {
-      await api.resolveApproval(session.id, approvalId, decision, opts);
+      await api.resolveApproval(session.id, approvalId, decision, {
+        reason: opts.reason,
+        updatedInput: opts.updatedInput,
+      });
+      if (decision === 'approve' && opts.nextPermissionMode) {
+        try {
+          await api.setPermissionMode(session.id, opts.nextPermissionMode);
+        } catch (e) {
+          addBubble({
+            kind: 'system',
+            text: `failed to switch permission mode: ${(e as Error).message}`,
+          } as Bubble);
+        }
+      }
     } catch (e) {
       setApprovals(prev => prev.filter(a => a.approvalId !== approvalId));
       addBubble({
@@ -244,6 +258,15 @@ export function Composer({
       await api.interrupt(session.id);
     } catch {
       // best effort
+    }
+  }
+
+  async function enterPlanMode() {
+    try {
+      await api.setPermissionMode(session.id, 'plan');
+      addBubble({ kind: 'system', text: 'switched to plan mode — claude will research and present a plan' } as Bubble);
+    } catch (e) {
+      addBubble({ kind: 'system', text: `couldn't switch to plan mode: ${(e as Error).message}` } as Bubble);
     }
   }
 
@@ -272,12 +295,27 @@ export function Composer({
 
       <div className="composer-quick-actions">
         <button
-          className="ghost quick-action"
+          className="quick-action"
           disabled={pending}
           onClick={() => sendPrompt('commit the changes')}
           title="Send: commit the changes"
         >
           Commit changes
+        </button>
+        <button
+          className="quick-action"
+          disabled={pending}
+          onClick={() => sendPrompt("how's it going?")}
+          title="Send: how's it going?"
+        >
+          Nudge
+        </button>
+        <button
+          className="quick-action"
+          onClick={enterPlanMode}
+          title="Switch the live agent into plan mode (read-only research, then a plan you approve)"
+        >
+          Plan mode
         </button>
       </div>
 
@@ -339,11 +377,14 @@ function ApprovalModal({
   approval: Approval;
   onResolve: (
     decision: 'approve' | 'deny',
-    opts?: { reason?: string; updatedInput?: unknown }
+    opts?: { reason?: string; updatedInput?: unknown; nextPermissionMode?: PermissionMode }
   ) => void;
 }) {
   if (approval.toolName === 'AskUserQuestion') {
     return <AskUserQuestionModal approval={approval} onResolve={onResolve} />;
+  }
+  if (approval.toolName === 'ExitPlanMode') {
+    return <ExitPlanModeModal approval={approval} onResolve={onResolve} />;
   }
   return (
     <div className="modal-bg">
@@ -356,6 +397,47 @@ function ApprovalModal({
         <div className="modal-actions">
           <button className="ghost" onClick={() => onResolve('deny')}>Deny</button>
           <button className="primary" autoFocus onClick={() => onResolve('approve')}>Approve</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExitPlanModeModal({
+  approval,
+  onResolve,
+}: {
+  approval: Approval;
+  onResolve: (
+    decision: 'approve' | 'deny',
+    opts?: { reason?: string; updatedInput?: unknown; nextPermissionMode?: PermissionMode }
+  ) => void;
+}) {
+  const plan = (approval.input?.plan as string | undefined) ?? '';
+  const accept = (mode: PermissionMode) => onResolve('approve', { nextPermissionMode: mode });
+  return (
+    <div className="modal-bg">
+      <div className="modal modal-approval modal-plan">
+        <h3>Plan ready — accept it?</h3>
+        <p className="muted small">
+          claude finished planning. Pick a mode to drop into when you accept.
+        </p>
+        <div className="plan-body">
+          {plan ? <Markdown>{plan}</Markdown> : <em className="muted">(empty plan)</em>}
+        </div>
+        <div className="modal-actions plan-actions">
+          <button className="ghost" onClick={() => onResolve('deny', { reason: 'keep planning' })}>
+            Keep planning
+          </button>
+          <button onClick={() => accept('default')} title="Accept the plan and ask before each tool">
+            Accept → default
+          </button>
+          <button onClick={() => accept('acceptEdits')} title="Accept the plan and auto-approve edits (still ask for shell etc.)">
+            Accept → accept edits
+          </button>
+          <button className="primary" autoFocus onClick={() => accept('bypassPermissions')} title="Accept the plan and auto-approve everything">
+            Accept → bypass
+          </button>
         </div>
       </div>
     </div>

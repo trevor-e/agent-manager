@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { config } from '../config.ts';
+import type { LaunchOptions } from '../db.ts';
 
 function shellEscape(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
@@ -12,6 +13,7 @@ export type LaunchOpts = {
   kind: LaunchKind;
   sessionId: string;
   title?: string | null;
+  launchOptions?: LaunchOptions | null;
 };
 
 export type LaunchResult = {
@@ -25,6 +27,17 @@ function buildClaudeArgv(opts: LaunchOpts): string[] {
     if (opts.title) args.push('--name', opts.title);
   } else {
     args.push('-r', opts.sessionId);
+  }
+  const lo = opts.launchOptions;
+  if (lo) {
+    if (lo.permissionMode) args.push('--permission-mode', lo.permissionMode);
+    if (lo.model) args.push('--model', lo.model);
+    if (lo.effort) args.push('--effort', lo.effort);
+    if (lo.addDirs && lo.addDirs.length > 0) args.push('--add-dir', ...lo.addDirs);
+    if (lo.worktree?.enabled) {
+      args.push('--worktree');
+      if (lo.worktree.name) args.push(lo.worktree.name);
+    }
   }
   return args;
 }

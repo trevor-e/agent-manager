@@ -65,6 +65,7 @@ addColumnIfMissing('sessions', 'pr_url', 'TEXT');
 addColumnIfMissing('sessions', 'pr_number', 'INTEGER');
 addColumnIfMissing('sessions', 'pr_repository', 'TEXT');
 addColumnIfMissing('sessions', 'pr_seen_at', 'INTEGER');
+addColumnIfMissing('sessions', 'launch_options', 'TEXT');
 addColumnIfMissing('running_processes', 'session_id', 'TEXT');
 
 const prevVersion = (db.prepare("SELECT value FROM schema_meta WHERE key = 'schema_version'").get() as
@@ -96,7 +97,16 @@ export type SessionRow = {
   pr_number: number | null;
   pr_repository: string | null;
   pr_seen_at: number | null;
+  launch_options: string | null;
   updated_at: number;
+};
+
+export type LaunchOptions = {
+  permissionMode?: 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions' | 'auto' | 'dontAsk';
+  worktree?: { enabled: boolean; name?: string };
+  model?: string;
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  addDirs?: string[];
 };
 
 export type ProcessRow = {
@@ -145,7 +155,7 @@ const upsertSessionStmt = db.prepare(`
     updated_at      = excluded.updated_at
 `);
 
-export type UpsertSessionInput = Omit<SessionRow, 'title' | 'user_status' | 'notes'>;
+export type UpsertSessionInput = Omit<SessionRow, 'title' | 'user_status' | 'notes' | 'launch_options'>;
 
 export function upsertSession(row: UpsertSessionInput) {
   upsertSessionStmt.run(row);
@@ -157,15 +167,27 @@ export const insertLaunchPlaceholderStmt = db.prepare(`
     title, auto_title, first_seen_at, last_event_at, last_event_type,
     last_prompt, file_mtime, file_size, user_status, notes,
     pr_url, pr_number, pr_repository, pr_seen_at,
-    updated_at
+    launch_options, updated_at
   ) VALUES (
     @id, 'local', @project_path, @repo_name, NULL, NULL,
     @title, NULL, @now, @now, 'launching',
     NULL, NULL, NULL, 'active', NULL,
     NULL, NULL, NULL, NULL,
-    @now
+    @launch_options, @now
   )
 `);
+
+export function getLaunchOptions(id: string): LaunchOptions | null {
+  const row = db
+    .prepare('SELECT launch_options FROM sessions WHERE id = ?')
+    .get(id) as { launch_options: string | null } | undefined;
+  if (!row?.launch_options) return null;
+  try {
+    return JSON.parse(row.launch_options) as LaunchOptions;
+  } catch {
+    return null;
+  }
+}
 
 export function setUserStatus(id: string, status: 'active' | 'done' | 'archived') {
   db.prepare('UPDATE sessions SET user_status = ?, updated_at = ? WHERE id = ?')

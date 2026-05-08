@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { existsSync } from 'node:fs';
 import { config } from '../config.ts';
-import { db, getSession } from '../db.ts';
+import { db, getSession, type LaunchOptions } from '../db.ts';
 import { log } from '../log.ts';
 import type {
   ControlRequestEnvelope,
@@ -13,6 +13,15 @@ import type {
   PermissionMode,
   PermissionResult,
 } from './types.ts';
+
+function parseLaunchOptions(raw: string | null | undefined): LaunchOptions | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as LaunchOptions;
+  } catch {
+    return null;
+  }
+}
 
 const TOOL_APPROVAL_CALLBACK = 'tool_approval';
 const AUTO_APPROVE_CALLBACK = 'auto_approve';
@@ -63,9 +72,12 @@ export class AgentProcess extends EventEmitter {
     // If the session has never been written to disk (placeholder row), use
     // --session-id to create a fresh session with that UUID. Otherwise --resume.
     const existing = db
-      .prepare('SELECT jsonl_path FROM sessions WHERE id = ?')
-      .get(this.sessionId) as { jsonl_path: string | null } | undefined;
+      .prepare('SELECT jsonl_path, launch_options FROM sessions WHERE id = ?')
+      .get(this.sessionId) as
+      | { jsonl_path: string | null; launch_options: string | null }
+      | undefined;
     const isNew = !existing?.jsonl_path;
+    const launchOptions = parseLaunchOptions(existing?.launch_options);
 
     const args = [
       '-p',
@@ -81,8 +93,15 @@ export class AgentProcess extends EventEmitter {
       '--permission-prompt-tool',
       'stdio',
       '--permission-mode',
-      'bypassPermissions',
+      launchOptions?.permissionMode ?? 'bypassPermissions',
     ];
+    if (launchOptions?.model) args.push('--model', launchOptions.model);
+    if (launchOptions?.effort) args.push('--effort', launchOptions.effort);
+    if (launchOptions?.addDirs?.length) args.push('--add-dir', ...launchOptions.addDirs);
+    if (launchOptions?.worktree?.enabled) {
+      args.push('--worktree');
+      if (launchOptions.worktree.name) args.push(launchOptions.worktree.name);
+    }
 
     this.child = spawn(config.claudeBin, args, {
       cwd: this.cwd,

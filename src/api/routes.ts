@@ -9,7 +9,9 @@ import {
   setTitle,
   insertLaunchPlaceholderStmt,
   db,
+  type LaunchOptions,
 } from '../db.ts';
+import type { PermissionMode } from '../agent/types.ts';
 import { runScanOnce } from '../scanner/index.ts';
 import { launchSession } from '../launcher/terminal.ts';
 import {
@@ -24,6 +26,7 @@ import { computeUsage } from '../scanner/usage.ts';
 import { agentManager } from '../agent/manager.ts';
 import type { AgentEvent } from '../agent/process.ts';
 import { log, type LogLevel } from '../log.ts';
+import { getBranchChanges, getWorkingChanges } from './git.ts';
 
 type RepoSummary = {
   repo_name: string;
@@ -93,13 +96,22 @@ export function registerRoutes(app: FastifyInstance) {
   });
 
   app.post<{
-    Body: { project_path: string; resume_id?: string; title?: string; web_only?: boolean };
+    Body: {
+      project_path: string;
+      resume_id?: string;
+      title?: string;
+      web_only?: boolean;
+      launch_options?: LaunchOptions;
+    };
   }>('/api/sessions/launch', async (req, reply) => {
-    const { project_path, resume_id, title, web_only } = req.body ?? ({} as any);
+    const { project_path, resume_id, title, web_only, launch_options } =
+      req.body ?? ({} as any);
     if (!project_path) {
       reply.code(400);
       return { error: 'project_path is required' };
     }
+
+    const normalized = normalizeLaunchOptions(launch_options);
 
     if (resume_id) {
       const existing = getSession(resume_id);
@@ -111,6 +123,7 @@ export function registerRoutes(app: FastifyInstance) {
         cwd: existing.project_path,
         kind: 'resume',
         sessionId: resume_id,
+        launchOptions: normalized,
       });
       return { ok: true, session_id: resume_id, command: result.command };
     }
@@ -123,6 +136,7 @@ export function registerRoutes(app: FastifyInstance) {
       project_path,
       repo_name: repoName,
       title: title ?? null,
+      launch_options: normalized ? JSON.stringify(normalized) : null,
       now,
     });
     if (web_only) {
@@ -133,6 +147,7 @@ export function registerRoutes(app: FastifyInstance) {
       kind: 'new',
       sessionId: id,
       title: title ?? null,
+      launchOptions: normalized,
     });
     return { ok: true, session_id: id, command: result.command };
   });
@@ -141,6 +156,27 @@ export function registerRoutes(app: FastifyInstance) {
     await runScanOnce();
     return { ok: true };
   });
+
+  app.get<{ Params: { id: string }; Querystring: { mode?: string } }>(
+    '/api/sessions/:id/git',
+    async (req, reply) => {
+      const row = getSession(req.params.id);
+      if (!row) {
+        reply.code(404);
+        return { error: 'not found' };
+      }
+      const mode = req.query?.mode === 'branch' ? 'branch' : 'working';
+      try {
+        const changes = mode === 'branch'
+          ? await getBranchChanges(row.project_path)
+          : await getWorkingChanges(row.project_path);
+        return { changes };
+      } catch (err) {
+        reply.code(500);
+        return { error: (err as Error).message };
+      }
+    }
+  );
 
   app.get('/api/health', async () => ({ ok: true }));
 
@@ -271,6 +307,24 @@ export function registerRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  app.post<{
+    Params: { id: string };
+    Body: { mode?: string };
+  }>('/api/sessions/:id/permission-mode', async (req, reply) => {
+    const proc = agentManager.get(req.params.id);
+    if (!proc || !proc.isAlive()) {
+      reply.code(404);
+      return { error: 'no live agent' };
+    }
+    const mode = req.body?.mode;
+    if (typeof mode !== 'string' || !PERMISSION_MODES.has(mode)) {
+      reply.code(400);
+      return { error: 'invalid permission mode' };
+    }
+    await proc.setPermissionMode(mode as PermissionMode);
+    return { ok: true };
+  });
+
   app.post<{ Params: { id: string } }>('/api/sessions/:id/stop', async (req, reply) => {
     const proc = agentManager.get(req.params.id);
     if (!proc) {
@@ -282,6 +336,45 @@ export function registerRoutes(app: FastifyInstance) {
   });
 }
 
+
+const PERMISSION_MODES = new Set([
+  'default',
+  'acceptEdits',
+  'plan',
+  'bypassPermissions',
+  'auto',
+  'dontAsk',
+]);
+const EFFORT_LEVELS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
+
+function normalizeLaunchOptions(input: unknown): LaunchOptions | null {
+  if (!input || typeof input !== 'object') return null;
+  const src = input as Record<string, unknown>;
+  const out: LaunchOptions = {};
+  if (typeof src.permissionMode === 'string' && PERMISSION_MODES.has(src.permissionMode)) {
+    out.permissionMode = src.permissionMode as LaunchOptions['permissionMode'];
+  }
+  if (typeof src.model === 'string' && src.model.trim()) {
+    out.model = src.model.trim();
+  }
+  if (typeof src.effort === 'string' && EFFORT_LEVELS.has(src.effort)) {
+    out.effort = src.effort as LaunchOptions['effort'];
+  }
+  if (Array.isArray(src.addDirs)) {
+    const dirs = src.addDirs.filter((d): d is string => typeof d === 'string' && d.trim() !== '');
+    if (dirs.length) out.addDirs = dirs.map(d => d.trim());
+  }
+  if (src.worktree && typeof src.worktree === 'object') {
+    const w = src.worktree as Record<string, unknown>;
+    if (w.enabled) {
+      out.worktree = { enabled: true };
+      if (typeof w.name === 'string' && w.name.trim()) {
+        out.worktree.name = w.name.trim();
+      }
+    }
+  }
+  return Object.keys(out).length ? out : null;
+}
 
 async function readLastEvents(path: string, n: number) {
   try {

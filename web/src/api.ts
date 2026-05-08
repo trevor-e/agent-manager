@@ -1,4 +1,4 @@
-import type { Session, RepoSummary, SessionEvent } from './types';
+import type { Session, RepoSummary, SessionEvent, GitChanges, LaunchOptions } from './types';
 
 async function jget<T>(url: string): Promise<T> {
   const r = await fetch(url);
@@ -30,8 +30,13 @@ export const api = {
   getSession: (id: string) => jget<{ session: Session; events: SessionEvent[] }>(`/api/sessions/${id}`),
   patchSession: (id: string, body: Partial<{ user_status: 'active' | 'done' | 'archived'; title: string | null }>) =>
     jsend<{ session: Session }>(`/api/sessions/${id}`, 'PATCH', body),
-  launch: (body: { project_path: string; resume_id?: string; title?: string; web_only?: boolean }) =>
-    jsend<{ ok: boolean; session_id: string }>('/api/sessions/launch', 'POST', body),
+  launch: (body: {
+    project_path: string;
+    resume_id?: string;
+    title?: string;
+    web_only?: boolean;
+    launch_options?: LaunchOptions;
+  }) => jsend<{ ok: boolean; session_id: string }>('/api/sessions/launch', 'POST', body),
   repos: () => jget<{ repos: RepoSummary[] }>('/api/repos'),
   scan: () => jsend<{ ok: boolean }>('/api/scan', 'POST'),
 
@@ -49,5 +54,10 @@ export const api = {
       updatedInput: opts.updatedInput,
     }),
   interrupt: (id: string) => jsend<{ ok: boolean }>(`/api/sessions/${id}/interrupt`, 'POST'),
+  setPermissionMode: (id: string, mode: import('./types').PermissionMode) =>
+    jsend<{ ok: boolean }>(`/api/sessions/${id}/permission-mode`, 'POST', { mode }),
   stopAgent: (id: string) => jsend<{ ok: boolean }>(`/api/sessions/${id}/stop`, 'POST'),
+
+  getGit: (id: string, mode: 'working' | 'branch') =>
+    jget<{ changes: GitChanges }>(`/api/sessions/${id}/git?mode=${mode}`),
 };

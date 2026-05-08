@@ -2,7 +2,13 @@
 // Outgoing: written to claude's stdin, one JSON object per line.
 // Incoming: parsed from claude's stdout, one JSON object per line.
 
-export type PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions';
+export type PermissionMode =
+  | 'default'
+  | 'acceptEdits'
+  | 'plan'
+  | 'bypassPermissions'
+  | 'auto'
+  | 'dontAsk';
 
 export type OutgoingUserMessage = {
   type: 'user';
