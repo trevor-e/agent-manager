@@ -338,7 +338,9 @@ export function Composer({
         text: `approval was no longer valid (${(e as Error).message}); the agent likely restarted`,
       } as Bubble);
     } finally {
-      textareaRef.current?.focus();
+      if (approvals.length <= 1) {
+        textareaRef.current?.focus();
+      }
     }
   }
 
