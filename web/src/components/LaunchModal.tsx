@@ -35,7 +35,9 @@ export function LaunchModal({
   onClose: () => void;
   onLaunched: () => void;
 }) {
-  const [projectPath, setProjectPath] = useState(initialProjectPath);
+  const [projectPath, setProjectPath] = useState(
+    initialProjectPath.replace(/\/\.claude\/worktrees\/[^/]+$/, '')
+  );
   const [title, setTitle] = useState(linearIssue ? `${linearIssue.identifier}: ${linearIssue.title}` : '');
   const [openInTerminal, setOpenInTerminal] = useState(false);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('auto');
