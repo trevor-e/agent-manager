@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Composer } from '../components/Composer';
 import { LaunchModal } from '../components/LaunchModal';
+import { SessionSidebar } from '../components/SessionSidebar';
 import type { RepoSummary, Session, SessionEvent } from '../types';
 
 const STATE_LABELS: Record<string, string> = {
@@ -144,6 +145,7 @@ export function DetailPage({ id }: { id: string }) {
 
       <div className="detail-body">
         <Composer key={session.id} session={session} initialEvents={events} />
+        <SessionSidebar currentSessionId={session.id} currentRepoName={session.repo_name} />
       </div>
 
       {launchOpen && (
