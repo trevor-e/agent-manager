@@ -245,11 +245,18 @@ export function DetailPage({ id }: { id: string }) {
                 ))}
             </div>
           )}
-          {session.pr_url && (
-            <div className="pr-row">
-              <a className="pr-link pr-link-large" href={session.pr_url} target="_blank" rel="noreferrer">
-                {session.pr_repository ?? 'PR'} #{session.pr_number}
-              </a>
+          {(session.linear_issue_identifier || session.pr_url) && (
+            <div className="pr-row" style={{ display: 'flex', gap: '8px' }}>
+              {session.linear_issue_identifier && session.linear_issue_url && (
+                <a className="linear-issue-link linear-issue-link-large" href={session.linear_issue_url} target="_blank" rel="noreferrer">
+                  {session.linear_issue_identifier}
+                </a>
+              )}
+              {session.pr_url && (
+                <a className="pr-link pr-link-large" href={session.pr_url} target="_blank" rel="noreferrer">
+                  {session.pr_repository ?? 'PR'} #{session.pr_number}
+                </a>
+              )}
             </div>
           )}
         </div>

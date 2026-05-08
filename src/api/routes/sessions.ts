@@ -22,6 +22,7 @@ import {
 } from '../state.ts';
 import { computeUsage } from '../../scanner/usage.ts';
 import { computeToolUsage } from '../../scanner/tools.ts';
+import { isConfigured as linearConfigured, getIssue } from '../../linear.ts';
 
 type RepoSummary = {
   repo_name: string;
@@ -137,12 +138,47 @@ export function registerSessionRoutes(app: FastifyInstance) {
     const id = randomUUID();
     const repoName = project_path.split('/').filter(Boolean).pop() ?? project_path;
     const now = Date.now();
+
+    let linearIssueId: string | null = null;
+    let linearIssueIdentifier: string | null = null;
+    let linearIssueUrl: string | null = null;
+    let autoTitle: string | null = null;
+
+    if (normalized?.linearIssueId && linearConfigured()) {
+      try {
+        const issue = await getIssue(normalized.linearIssueId);
+        linearIssueId = issue.id;
+        linearIssueIdentifier = issue.identifier;
+        linearIssueUrl = issue.url;
+        if (!title) {
+          autoTitle = `${issue.identifier}: ${issue.title}`;
+        }
+        const issueContext = [
+          `You are working on Linear issue ${issue.identifier}: ${issue.title}`,
+          '',
+          issue.description ?? '',
+          '',
+          `Issue URL: ${issue.url}`,
+        ].join('\n').trim();
+        const existing = normalized.appendSystemPrompt ?? '';
+        normalized.appendSystemPrompt = existing
+          ? `${existing}\n\n${issueContext}`
+          : issueContext;
+      } catch {
+        // Issue fetch failed — continue without it
+      }
+      delete normalized.linearIssueId;
+    }
+
     insertLaunchPlaceholderStmt.run({
       id,
       project_path,
       repo_name: repoName,
-      title: title ?? null,
+      title: title ?? autoTitle ?? null,
       launch_options: normalized ? JSON.stringify(normalized) : null,
+      linear_issue_id: linearIssueId,
+      linear_issue_identifier: linearIssueIdentifier,
+      linear_issue_url: linearIssueUrl,
       now,
     });
     if (web_only) {
@@ -181,6 +217,9 @@ export function registerSessionRoutes(app: FastifyInstance) {
       repo_name: repoName,
       title: `Fork of ${parent.title ?? parent.auto_title ?? parent.id.slice(0, 8)}`,
       launch_options: JSON.stringify(normalized),
+      linear_issue_id: null,
+      linear_issue_identifier: null,
+      linear_issue_url: null,
       now,
     });
     db.prepare('UPDATE sessions SET parent_session_id = ? WHERE id = ?').run(parent.id, id);
@@ -234,6 +273,9 @@ function normalizeLaunchOptions(input: unknown): LaunchOptions | null {
   }
   if (typeof src.appendSystemPrompt === 'string' && src.appendSystemPrompt.trim()) {
     out.appendSystemPrompt = src.appendSystemPrompt.trim();
+  }
+  if (typeof src.linearIssueId === 'string' && src.linearIssueId.trim()) {
+    out.linearIssueId = src.linearIssueId.trim();
   }
   return Object.keys(out).length ? out : null;
 }

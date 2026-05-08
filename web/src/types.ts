@@ -34,6 +34,9 @@ export type Session = {
   pr_number: number | null;
   pr_repository: string | null;
   pr_seen_at: number | null;
+  linear_issue_id: string | null;
+  linear_issue_identifier: string | null;
+  linear_issue_url: string | null;
   derived_state: DerivedState;
   display_name: string;
   is_running: boolean;
@@ -90,4 +93,24 @@ export type LaunchOptions = {
   addDirs?: string[];
   systemPrompt?: string;
   appendSystemPrompt?: string;
+  linearIssueId?: string;
+};
+
+export type LinearIssue = {
+  id: string;
+  identifier: string;
+  title: string;
+  description: string | null;
+  priority: number;
+  url: string;
+  state: { id: string; name: string; type: string };
+  assignee: { id: string; name: string } | null;
+  project: { id: string; name: string } | null;
+  labels: { id: string; name: string }[];
+};
+
+export type LinearProject = {
+  id: string;
+  name: string;
+  issueCount: number;
 };

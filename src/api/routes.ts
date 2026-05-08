@@ -3,10 +3,14 @@ import { registerSessionRoutes } from './routes/sessions.ts';
 import { registerAgentRoutes } from './routes/agent.ts';
 import { registerGitRoutes } from './routes/git.ts';
 import { registerLogRoutes } from './routes/log.ts';
+import { registerLinearRoutes } from './routes/linear.ts';
+import { registerKeyRoutes } from './routes/keys.ts';
 
 export function registerRoutes(app: FastifyInstance) {
   registerSessionRoutes(app);
   registerAgentRoutes(app);
   registerGitRoutes(app);
   registerLogRoutes(app);
+  registerLinearRoutes(app);
+  registerKeyRoutes(app);
 }

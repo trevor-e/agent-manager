@@ -1,4 +1,4 @@
-import type { Session, RepoSummary, SessionEvent, GitChanges, LaunchOptions } from './types';
+import type { Session, RepoSummary, SessionEvent, GitChanges, LaunchOptions, LinearIssue, LinearProject } from './types';
 
 async function jget<T>(url: string): Promise<T> {
   const r = await fetch(url);
@@ -69,4 +69,16 @@ export const api = {
 
   getGit: (id: string, mode: 'working' | 'branch') =>
     jget<{ changes: GitChanges }>(`/api/sessions/${id}/git?mode=${mode}`),
+
+  linearStatus: () => jget<{ configured: boolean }>('/api/linear/status'),
+  linearIssues: (params: { projectId?: string; stateType?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.projectId) qs.set('projectId', params.projectId);
+    if (params.stateType) qs.set('stateType', params.stateType);
+    return jget<{ issues: LinearIssue[] }>(`/api/linear/issues?${qs.toString()}`);
+  },
+  linearProjects: () => jget<{ projects: LinearProject[] }>('/api/linear/projects'),
+
+  getKeys: () => jget<{ keys: Record<string, { set: boolean; source: string | null; masked: string | null }> }>('/api/keys'),
+  setKeys: (keys: Record<string, string | null>) => jsend<{ ok: boolean }>('/api/keys', 'PUT', keys),
 };

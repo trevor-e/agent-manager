@@ -68,6 +68,9 @@ addColumnIfMissing('sessions', 'pr_seen_at', 'INTEGER');
 addColumnIfMissing('sessions', 'launch_options', 'TEXT');
 addColumnIfMissing('running_processes', 'session_id', 'TEXT');
 addColumnIfMissing('sessions', 'parent_session_id', 'TEXT');
+addColumnIfMissing('sessions', 'linear_issue_id', 'TEXT');
+addColumnIfMissing('sessions', 'linear_issue_identifier', 'TEXT');
+addColumnIfMissing('sessions', 'linear_issue_url', 'TEXT');
 
 const prevVersion = (db.prepare("SELECT value FROM schema_meta WHERE key = 'schema_version'").get() as
   | { value: string }
@@ -127,6 +130,9 @@ export type SessionRow = {
   pr_repository: string | null;
   pr_seen_at: number | null;
   launch_options: string | null;
+  linear_issue_id: string | null;
+  linear_issue_identifier: string | null;
+  linear_issue_url: string | null;
   updated_at: number;
 };
 
@@ -139,6 +145,7 @@ export type LaunchOptions = {
   systemPrompt?: string;
   appendSystemPrompt?: string;
   forkFrom?: string;
+  linearIssueId?: string;
 };
 
 export type ProcessRow = {
@@ -187,7 +194,7 @@ const upsertSessionStmt = db.prepare(`
     updated_at      = excluded.updated_at
 `);
 
-export type UpsertSessionInput = Omit<SessionRow, 'title' | 'user_status' | 'notes' | 'launch_options'>;
+export type UpsertSessionInput = Omit<SessionRow, 'title' | 'user_status' | 'notes' | 'launch_options' | 'linear_issue_id' | 'linear_issue_identifier' | 'linear_issue_url'>;
 
 export function upsertSession(row: UpsertSessionInput) {
   upsertSessionStmt.run(row);
@@ -199,13 +206,17 @@ export const insertLaunchPlaceholderStmt = db.prepare(`
     title, auto_title, first_seen_at, last_event_at, last_event_type,
     last_prompt, file_mtime, file_size, user_status, notes,
     pr_url, pr_number, pr_repository, pr_seen_at,
-    launch_options, updated_at
+    launch_options,
+    linear_issue_id, linear_issue_identifier, linear_issue_url,
+    updated_at
   ) VALUES (
     @id, 'local', @project_path, @repo_name, NULL, NULL,
     @title, NULL, @now, @now, 'launching',
     NULL, NULL, NULL, 'active', NULL,
     NULL, NULL, NULL, NULL,
-    @launch_options, @now
+    @launch_options,
+    @linear_issue_id, @linear_issue_identifier, @linear_issue_url,
+    @now
   )
 `);
 
@@ -229,6 +240,19 @@ export function setUserStatus(id: string, status: 'active' | 'done' | 'archived'
 export function setTitle(id: string, title: string | null) {
   db.prepare('UPDATE sessions SET title = ?, updated_at = ? WHERE id = ?')
     .run(title, Date.now(), id);
+}
+
+export function getMeta(key: string): string | null {
+  const row = db.prepare('SELECT value FROM schema_meta WHERE key = ?').get(key) as { value: string } | undefined;
+  return row?.value ?? null;
+}
+
+export function setMeta(key: string, value: string | null) {
+  if (value === null || value === '') {
+    db.prepare('DELETE FROM schema_meta WHERE key = ?').run(key);
+  } else {
+    db.prepare('INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)').run(key, value);
+  }
 }
 
 export function setNotes(id: string, notes: string | null) {

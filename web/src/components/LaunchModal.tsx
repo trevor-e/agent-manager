@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api';
 import { navigate } from '../App';
-import type { EffortLevel, LaunchOptions, PermissionMode, RepoSummary } from '../types';
+import type { EffortLevel, LaunchOptions, LinearIssue, PermissionMode, RepoSummary } from '../types';
 
 const PERMISSION_MODES: { value: PermissionMode; label: string }[] = [
   { value: 'auto', label: 'Auto (classifier decides)' },
@@ -24,16 +24,18 @@ const EFFORTS: { value: EffortLevel | ''; label: string }[] = [
 export function LaunchModal({
   repos,
   initialProjectPath = '',
+  linearIssue,
   onClose,
   onLaunched,
 }: {
   repos: RepoSummary[];
   initialProjectPath?: string;
+  linearIssue?: LinearIssue;
   onClose: () => void;
   onLaunched: () => void;
 }) {
   const [projectPath, setProjectPath] = useState(initialProjectPath);
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(linearIssue ? `${linearIssue.identifier}: ${linearIssue.title}` : '');
   const [openInTerminal, setOpenInTerminal] = useState(false);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('auto');
   const [worktreeEnabled, setWorktreeEnabled] = useState(false);
@@ -61,6 +63,7 @@ export function LaunchModal({
     if (dirs.length) opts.addDirs = dirs;
     if (systemPrompt.trim()) opts.systemPrompt = systemPrompt.trim();
     if (appendSystemPrompt.trim()) opts.appendSystemPrompt = appendSystemPrompt.trim();
+    if (linearIssue) opts.linearIssueId = linearIssue.id;
     return opts;
   }
 
@@ -91,6 +94,11 @@ export function LaunchModal({
     <div className="modal-bg" onClick={onClose}>
       <form className="modal" onClick={e => e.stopPropagation()} onSubmit={submit}>
         <h3>Launch new session</h3>
+        {linearIssue && (
+          <a className="linear-issue-link" href={linearIssue.url} target="_blank" rel="noreferrer">
+            {linearIssue.identifier}: {linearIssue.title}
+          </a>
+        )}
         <label>Project directory</label>
         <input
           autoFocus

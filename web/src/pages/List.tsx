@@ -164,6 +164,17 @@ export function ListPage() {
               >
                 {s.display_name}
               </a>
+              {s.linear_issue_identifier && s.linear_issue_url && (
+                <a
+                  className="linear-issue-link"
+                  href={s.linear_issue_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={e => e.stopPropagation()}
+                >
+                  {s.linear_issue_identifier}
+                </a>
+              )}
               {s.pr_url && (
                 <a
                   className="pr-link"
