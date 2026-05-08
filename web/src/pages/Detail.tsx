@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { navigate } from '../App';
 import { Composer } from '../components/Composer';
+import { GitView } from '../components/GitView';
 import { LaunchModal } from '../components/LaunchModal';
 import { SessionSidebar, sortSidebarSessions } from '../components/SessionSidebar';
 import { computeSlots, rememberSlotNav } from '../sessionSlots';
@@ -44,6 +45,7 @@ export function DetailPage({ id }: { id: string }) {
   const [repos, setRepos] = useState<RepoSummary[]>([]);
   const [activeSessions, setActiveSessions] = useState<Session[]>([]);
   const [activeLoaded, setActiveLoaded] = useState(false);
+  const [view, setView] = useState<'conversation' | 'diff'>('conversation');
   const now = useNow();
 
   async function refresh() {
@@ -140,6 +142,12 @@ export function DetailPage({ id }: { id: string }) {
         markDone();
         return;
       }
+      if (!e.shiftKey && !e.altKey && key === 'b') {
+        if (isInputFocused()) return;
+        e.preventDefault();
+        setView(v => (v === 'conversation' ? 'diff' : 'conversation'));
+        return;
+      }
       if (!e.shiftKey && !e.altKey && /^[1-9]$/.test(e.key)) {
         const slot = Number(e.key);
         const targetId = sessionBySlot.get(slot);
@@ -230,6 +238,14 @@ export function DetailPage({ id }: { id: string }) {
           <button className="primary" onClick={() => setLaunchOpen(true)} title="New session">
             + New session <kbd className="kbd-hint">⌘E</kbd>
           </button>
+          <button
+            className="green"
+            onClick={() => setView(v => (v === 'conversation' ? 'diff' : 'conversation'))}
+            title="Toggle conversation / diff view"
+          >
+            {view === 'conversation' ? 'View changes' : 'View chat'}
+            <kbd className="kbd-hint">⌘B</kbd>
+          </button>
           <button onClick={resume}>Resume in Ghostty</button>
           <button className="ghost" onClick={markDone} title="Toggle done">
             {session.user_status === 'done' ? 'Mark active' : 'Mark done'}
@@ -239,7 +255,11 @@ export function DetailPage({ id }: { id: string }) {
       </div>
 
       <div className="detail-body">
-        <Composer key={session.id} session={session} initialEvents={events} />
+        {view === 'conversation' ? (
+          <Composer key={session.id} session={session} initialEvents={events} />
+        ) : (
+          <GitView sessionId={session.id} />
+        )}
         <SessionSidebar
           currentSessionId={session.id}
           currentRepoName={session.repo_name}

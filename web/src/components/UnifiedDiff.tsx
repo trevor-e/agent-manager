@@ -56,6 +56,50 @@ export function UnifiedDiff({ oldText, newText, filePath, context = 3 }: Props) 
   );
 }
 
+// Render unified-diff text (already produced by `git diff`).
+export function RawUnifiedDiff({ diff, filePath }: { diff: string; filePath?: string }) {
+  const lines = useMemo(() => parseUnifiedDiff(diff ?? ''), [diff]);
+
+  if (lines.length === 0) {
+    return <div className="diff diff-empty muted small">no textual changes</div>;
+  }
+
+  return (
+    <div className="diff">
+      {filePath && <div className="diff-header mono">{filePath}</div>}
+      <pre className="diff-body mono">
+        {lines.map((l, i) => (
+          <div key={i} className={`diff-line diff-line-${l.kind}`}>
+            <span className="diff-marker">
+              {l.kind === 'add' ? '+' : l.kind === 'del' ? '-' : l.kind === 'hunk' ? '' : ' '}
+            </span>
+            <span className="diff-text">{l.text}</span>
+          </div>
+        ))}
+      </pre>
+    </div>
+  );
+}
+
+function parseUnifiedDiff(text: string): Line[] {
+  const out: Line[] = [];
+  let inHunk = false;
+  for (const raw of text.split('\n')) {
+    if (raw.startsWith('@@')) {
+      out.push({ kind: 'hunk', text: raw });
+      inHunk = true;
+      continue;
+    }
+    if (!inHunk) continue;
+    if (raw.startsWith('\\ ')) continue;
+    const m = raw[0];
+    if (m === '+') out.push({ kind: 'add', text: raw.slice(1) });
+    else if (m === '-') out.push({ kind: 'del', text: raw.slice(1) });
+    else out.push({ kind: 'ctx', text: raw.startsWith(' ') ? raw.slice(1) : raw });
+  }
+  return out;
+}
+
 // Convenience: render an additions-only "diff" (e.g. for Write tool full content).
 export function AdditionsView({ content, filePath }: { content: string; filePath?: string }) {
   const lines = (content ?? '').split('\n');
