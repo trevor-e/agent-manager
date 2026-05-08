@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { navigate } from '../App';
 import type { Session } from '../types';
+import { useNow } from '../useNow';
 
 const STATE_BADGES: Record<string, { label: string; cls: string }> = {
   launching: { label: 'launching', cls: 'badge badge-launching' },
@@ -13,8 +14,8 @@ const STATE_BADGES: Record<string, { label: string; cls: string }> = {
   archived: { label: 'archived', cls: 'badge badge-archived' },
 };
 
-function ageStr(ms: number): string {
-  const d = Date.now() - ms;
+function ageStr(now: number, ms: number): string {
+  const d = now - ms;
   if (d < 60_000) return `${Math.floor(d / 1000)}s`;
   if (d < 3_600_000) return `${Math.floor(d / 60_000)}m`;
   if (d < 86_400_000) return `${Math.floor(d / 3_600_000)}h`;
@@ -23,6 +24,7 @@ function ageStr(ms: number): string {
 
 function SidebarItem({ session, showRepo }: { session: Session; showRepo: boolean }) {
   const badge = STATE_BADGES[session.derived_state] ?? STATE_BADGES.idle;
+  const now = useNow();
   return (
     <a
       className="sidebar-item"
@@ -38,7 +40,7 @@ function SidebarItem({ session, showRepo }: { session: Session; showRepo: boolea
         <div className="sidebar-item-title">{session.display_name}</div>
         <div className="sidebar-item-meta muted small">
           {showRepo && <span className="sidebar-item-repo">{session.repo_name}</span>}
-          <span>{ageStr(session.last_event_at)}</span>
+          <span>{ageStr(now, session.last_event_at)}</span>
         </div>
       </div>
     </a>

@@ -4,6 +4,7 @@ import { Composer } from '../components/Composer';
 import { LaunchModal } from '../components/LaunchModal';
 import { SessionSidebar } from '../components/SessionSidebar';
 import type { RepoSummary, Session, SessionEvent } from '../types';
+import { useNow } from '../useNow';
 
 const STATE_LABELS: Record<string, string> = {
   launching: '🚀 launching',
@@ -16,8 +17,8 @@ const STATE_LABELS: Record<string, string> = {
   archived: '📦 archived',
 };
 
-function ageStr(ms: number): string {
-  const d = Date.now() - ms;
+function ageStr(now: number, ms: number): string {
+  const d = now - ms;
   if (d < 60_000) return `${Math.floor(d / 1000)}s`;
   if (d < 3_600_000) return `${Math.floor(d / 60_000)}m`;
   if (d < 86_400_000) return `${Math.floor(d / 3_600_000)}h`;
@@ -31,6 +32,7 @@ export function DetailPage({ id }: { id: string }) {
   const [titleDraft, setTitleDraft] = useState('');
   const [launchOpen, setLaunchOpen] = useState(false);
   const [repos, setRepos] = useState<RepoSummary[]>([]);
+  const now = useNow();
 
   async function refresh() {
     try {
@@ -121,7 +123,7 @@ export function DetailPage({ id }: { id: string }) {
               </>
             )}
             <span>•</span>
-            <span>last activity {ageStr(session.last_event_at)} ago</span>
+            <span>last activity {ageStr(now, session.last_event_at)} ago</span>
           </div>
           {session.pr_url && (
             <div className="pr-row">

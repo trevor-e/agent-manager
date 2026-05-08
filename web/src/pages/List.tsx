@@ -3,6 +3,7 @@ import { api } from '../api';
 import { navigate } from '../App';
 import { LaunchModal } from '../components/LaunchModal';
 import type { Session, RepoSummary } from '../types';
+import { useNow } from '../useNow';
 
 const STATE_BADGES: Record<string, { label: string; cls: string }> = {
   launching: { label: 'launching', cls: 'badge badge-launching' },
@@ -19,8 +20,8 @@ const FILTER_CHIPS = [
   { key: 'done', label: 'Done' },
 ];
 
-function ageStr(ms: number): string {
-  const d = Date.now() - ms;
+function ageStr(now: number, ms: number): string {
+  const d = now - ms;
   if (d < 60_000) return `${Math.floor(d / 1000)}s ago`;
   if (d < 3_600_000) return `${Math.floor(d / 60_000)}m ago`;
   if (d < 86_400_000) return `${Math.floor(d / 3_600_000)}h ago`;
@@ -36,6 +37,7 @@ export function ListPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [launchOpen, setLaunchOpen] = useState(false);
+  const now = useNow();
 
   async function refresh() {
     try {
@@ -168,7 +170,7 @@ export function ListPage() {
                   {isDone ? 'Reopen' : 'Mark done'}
                 </button>
               </div>
-              <span className="muted small row-age">{ageStr(s.last_event_at)}</span>
+              <span className="muted small row-age">{ageStr(now, s.last_event_at)}</span>
             </li>
           );
         })}

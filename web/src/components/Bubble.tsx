@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useNow } from '../useNow';
 
 export type AssistantBubble = { kind: 'assistant'; id: string; messageId: string; text: string };
 export type UserBubble = { kind: 'user'; id: string; text: string };
@@ -143,13 +144,7 @@ function formatElapsed(ms: number): string {
 }
 
 function useToolElapsed(bubble: ToolUseBubble): string | null {
-  const inFlight = bubble.endedAt === undefined && bubble.status !== 'denied';
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!inFlight || bubble.startedAt === undefined) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [inFlight, bubble.startedAt]);
+  const now = useNow();
   if (bubble.startedAt === undefined) return null;
   const end = bubble.endedAt ?? now;
   return formatElapsed(end - bubble.startedAt);
