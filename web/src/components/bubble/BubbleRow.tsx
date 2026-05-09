@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNow } from '../../useNow';
 import { detectDanger } from '../../dangerDetect';
 import { Markdown } from '../Markdown';
-import { ToolInputView } from './ToolInputView';
+import { UnifiedDiff, AdditionsView } from '../UnifiedDiff';
 import type { Bubble, ToolUseBubble } from './types';
 
 function formatElapsed(ms: number): string {
@@ -37,14 +37,7 @@ function summarizeInput(toolName: string, input: any): string {
   if (typeof input.url === 'string') return input.url;
   if (typeof input.description === 'string') return input.description;
   const json = JSON.stringify(input);
-  return json.length > 120 ? json.slice(0, 120) + '…' : json;
-}
-
-function statusBadge(b: ToolUseBubble): string {
-  if (b.status === 'denied') return '✕';
-  if (b.status === 'completed') return b.resultIsError ? '✕' : '✓';
-  if (b.status === 'allowed') return '·';
-  return '…';
+  return json.length > 200 ? json.slice(0, 200) + '…' : json;
 }
 
 export function BubbleRow({ bubble }: { bubble: Bubble }) {
@@ -81,8 +74,10 @@ export function BubbleRow({ bubble }: { bubble: Bubble }) {
   );
 }
 
+const PREVIEW_LINES = 4;
+
 function ToolBubbleRow({ bubble }: { bubble: ToolUseBubble }) {
-  const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const summary = useMemo(
     () => summarizeInput(bubble.toolName, bubble.input),
     [bubble.toolName, bubble.input]
@@ -91,49 +86,79 @@ function ToolBubbleRow({ bubble }: { bubble: ToolUseBubble }) {
     () => detectDanger(bubble.toolName, bubble.input),
     [bubble.toolName, bubble.input]
   );
-  const badge = statusBadge(bubble);
-  const klass =
-    'bubble-tool ' +
-    (bubble.status === 'denied' || bubble.resultIsError ? 'bubble-tool-error' : '') +
-    (danger.dangerous ? ' bubble-tool-dangerous' : '');
   const elapsed = useToolElapsed(bubble);
+
+  const dotClass =
+    (bubble.status === 'denied' || bubble.resultIsError) ? 'cli-dot-error' :
+    bubble.status === 'completed' ? 'cli-dot-success' :
+    bubble.status === 'allowed' ? 'cli-dot-running' :
+    'cli-dot-pending';
+
+  const isEdit = bubble.toolName === 'Edit'
+    && typeof bubble.input?.old_string === 'string'
+    && typeof bubble.input?.new_string === 'string';
+  const isWrite = bubble.toolName === 'Write'
+    && typeof bubble.input?.content === 'string';
+  const hasDiff = isEdit || isWrite;
+
+  const resultText = bubble.result ?? '';
+  const resultLines = resultText ? resultText.split('\n') : [];
+  const canTruncate = !hasDiff && resultLines.length > PREVIEW_LINES;
+  const displayText = !expanded && canTruncate
+    ? resultLines.slice(0, PREVIEW_LINES).join('\n')
+    : resultText;
+  const hiddenCount = resultLines.length - PREVIEW_LINES;
+
+  const hasOutput = bubble.result !== undefined || hasDiff;
+
   return (
     <div className="bubble-row bubble-row-tool">
-      <button
-        type="button"
-        className={'bubble ' + klass}
-        onClick={() => setOpen(o => !o)}
-        title={open ? 'collapse' : 'expand'}
-      >
-        <span className="tool-chevron">{open ? '▾' : '▸'}</span>
-        <span className="tool-status">{badge}</span>
-        <span className="tool-name">{bubble.toolName}</span>
-        {danger.dangerous && <span className="tool-danger-badge" title={danger.reason}>danger</span>}
-        <span className="tool-summary mono">{summary}</span>
-        {elapsed && <span className="tool-elapsed mono">{elapsed}</span>}
-      </button>
-      {open && (
-        <div className="tool-details mono small">
-          <div className="tool-section-label">input</div>
-          <ToolInputView input={bubble.input} toolName={bubble.toolName} />
-          {bubble.result !== undefined && (
-            <>
-              <div className="tool-section-label">{bubble.resultIsError ? 'error' : 'result'}</div>
-              {bubble.resultIsError ? (
-                <pre className="tool-pre tool-pre-error">
-                  {bubble.result.length > 8000 ? bubble.result.slice(0, 8000) + '…' : bubble.result}
-                </pre>
-              ) : (
-                <div className="tool-result-md">
-                  <Markdown>
-                    {bubble.result.length > 8000 ? bubble.result.slice(0, 8000) + '…' : bubble.result}
-                  </Markdown>
-                </div>
-              )}
-            </>
+      <div className={`cli-tool${danger.dangerous ? ' cli-tool-dangerous' : ''}`}>
+        <div className="cli-tool-header">
+          <span className={`cli-dot ${dotClass}`}>●</span>
+          <span className="cli-tool-label">
+            <span className="cli-tool-name">{bubble.toolName}</span>
+            (<span className="cli-tool-args">{summary}</span>)
+          </span>
+          {danger.dangerous && (
+            <span className="tool-danger-badge" title={danger.reason}>danger</span>
           )}
+          {elapsed && <span className="cli-elapsed">{elapsed}</span>}
         </div>
-      )}
+
+        {hasOutput && (
+          <div className="cli-tool-output">
+            <span className="cli-connector">└</span>
+            <div className="cli-tool-body">
+              {isEdit ? (
+                <UnifiedDiff
+                  oldText={bubble.input.old_string}
+                  newText={bubble.input.new_string}
+                  filePath={bubble.input.file_path}
+                />
+              ) : isWrite ? (
+                <AdditionsView
+                  content={bubble.input.content}
+                  filePath={bubble.input.file_path}
+                />
+              ) : (
+                <pre className={`cli-result${bubble.resultIsError ? ' cli-result-error' : ''}`}>
+                  {displayText.length > 8000 ? displayText.slice(0, 8000) + '…' : displayText}
+                </pre>
+              )}
+              {canTruncate && !expanded && (
+                <button
+                  type="button"
+                  className="cli-expand"
+                  onClick={() => setExpanded(true)}
+                >
+                  … +{hiddenCount} lines (click to expand)
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
