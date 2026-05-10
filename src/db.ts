@@ -194,7 +194,7 @@ const upsertSessionStmt = db.prepare(`
     updated_at      = excluded.updated_at
 `);
 
-export type UpsertSessionInput = Omit<SessionRow, 'title' | 'user_status' | 'notes' | 'launch_options' | 'linear_issue_id' | 'linear_issue_identifier' | 'linear_issue_url'>;
+export type UpsertSessionInput = Omit<SessionRow, 'title' | 'user_status' | 'launch_options' | 'linear_issue_id' | 'linear_issue_identifier' | 'linear_issue_url'>;
 
 export function upsertSession(row: UpsertSessionInput) {
   upsertSessionStmt.run(row);
@@ -204,7 +204,7 @@ export const insertLaunchPlaceholderStmt = db.prepare(`
   INSERT INTO sessions (
     id, host, project_path, repo_name, jsonl_path, git_branch,
     title, auto_title, first_seen_at, last_event_at, last_event_type,
-    last_prompt, file_mtime, file_size, user_status, notes,
+    last_prompt, file_mtime, file_size, user_status,
     pr_url, pr_number, pr_repository, pr_seen_at,
     launch_options,
     linear_issue_id, linear_issue_identifier, linear_issue_url,
@@ -212,7 +212,7 @@ export const insertLaunchPlaceholderStmt = db.prepare(`
   ) VALUES (
     @id, 'local', @project_path, @repo_name, NULL, NULL,
     @title, NULL, @now, @now, 'launching',
-    NULL, NULL, NULL, 'active', NULL,
+    NULL, NULL, NULL, 'active',
     NULL, NULL, NULL, NULL,
     @launch_options,
     @linear_issue_id, @linear_issue_identifier, @linear_issue_url,
@@ -242,6 +242,11 @@ export function setTitle(id: string, title: string | null) {
     .run(title, Date.now(), id);
 }
 
+export function setLaunchOptions(id: string, opts: LaunchOptions) {
+  db.prepare('UPDATE sessions SET launch_options = ?, updated_at = ? WHERE id = ?')
+    .run(JSON.stringify(opts), Date.now(), id);
+}
+
 export function getMeta(key: string): string | null {
   const row = db.prepare('SELECT value FROM schema_meta WHERE key = ?').get(key) as { value: string } | undefined;
   return row?.value ?? null;
@@ -253,11 +258,6 @@ export function setMeta(key: string, value: string | null) {
   } else {
     db.prepare('INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)').run(key, value);
   }
-}
-
-export function setNotes(id: string, notes: string | null) {
-  db.prepare('UPDATE sessions SET notes = ?, updated_at = ? WHERE id = ?')
-    .run(notes, Date.now(), id);
 }
 
 export function getSession(id: string): SessionRow | undefined {

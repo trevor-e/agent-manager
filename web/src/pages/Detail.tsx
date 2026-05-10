@@ -291,7 +291,7 @@ export function DetailPage({ id }: { id: string }) {
 
       <div className="detail-body">
         {view === 'conversation' ? (
-          <Composer key={session.id} session={session} initialEvents={events} />
+          <Composer key={session.id} session={session} initialEvents={events} repos={repos} />
         ) : (
           <GitView sessionId={session.id} />
         )}

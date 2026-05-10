@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../api';
 import { navigate } from '../App';
 import type { EffortLevel, LaunchOptions, LinearIssue, PermissionMode, RepoSummary } from '../types';
+import { RepoSelect } from './RepoSelect';
 
 const PERMISSION_MODES: { value: PermissionMode; label: string }[] = [
   { value: 'auto', label: 'Auto (classifier decides)' },
@@ -102,18 +103,12 @@ export function LaunchModal({
           </a>
         )}
         <label>Project directory</label>
-        <input
-          autoFocus
-          list="repo-paths"
+        <RepoSelect
+          repos={repos}
           value={projectPath}
-          onChange={e => setProjectPath(e.target.value)}
-          placeholder="/Users/.../some-repo"
+          onChange={setProjectPath}
+          autoFocus
         />
-        <datalist id="repo-paths">
-          {repos.map(r => (
-            <option key={r.project_path} value={r.project_path}>{r.repo_name}</option>
-          ))}
-        </datalist>
         <label>Title (optional)</label>
         <input
           value={title}

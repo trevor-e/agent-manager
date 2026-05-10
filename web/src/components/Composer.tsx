@@ -499,7 +499,33 @@ export function Composer({
         >
           Plan mode
         </button>
+        <button
+          className="quick-action"
+          onClick={() => { setAddDirOpen(v => !v); setAddDirValue(''); }}
+          title="Add another repo/directory to this session's context"
+        >
+          {addDirOpen ? 'Cancel' : 'Add directory'}
+        </button>
       </div>
+
+      {addDirOpen && (
+        <div className="add-dir-inline">
+          <RepoSelect
+            repos={repos.filter(r => r.project_path !== session.project_path)}
+            value={addDirValue}
+            onChange={setAddDirValue}
+            autoFocus
+            placeholder="pick or type a directory path"
+          />
+          <button
+            className="primary"
+            disabled={!addDirValue.trim()}
+            onClick={() => addDirectory(addDirValue)}
+          >
+            Add
+          </button>
+        </div>
+      )}
 
       {(attachments.length > 0 || attachError) && (
         <div className="composer-attachments">

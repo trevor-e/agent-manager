@@ -64,6 +64,8 @@ export const api = {
   setPermissionMode: (id: string, mode: import('./types').PermissionMode) =>
     jsend<{ ok: boolean }>(`/api/sessions/${id}/permission-mode`, 'POST', { mode }),
   stopAgent: (id: string) => jsend<{ ok: boolean }>(`/api/sessions/${id}/stop`, 'POST'),
+  addDir: (id: string, path: string) =>
+    jsend<{ ok: boolean; restarted: boolean }>(`/api/sessions/${id}/add-dir`, 'POST', { path }),
   forkSession: (id: string, opts?: { web_only?: boolean }) =>
     jsend<{ ok: boolean; session_id: string }>(`/api/sessions/${id}/fork`, 'POST', opts),
 

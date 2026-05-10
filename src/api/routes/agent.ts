@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { getSession } from '../../db.ts';
+import { getSession, getLaunchOptions, setLaunchOptions } from '../../db.ts';
 import type { PermissionMode } from '../../agent/types.ts';
 import type { UserContentBlock } from '../../agent/types.ts';
 import { agentManager } from '../../agent/manager.ts';
@@ -167,5 +167,35 @@ export function registerAgentRoutes(app: FastifyInstance) {
     }
     proc.stop();
     return { ok: true };
+  });
+
+  app.post<{
+    Params: { id: string };
+    Body: { path: string };
+  }>('/api/sessions/:id/add-dir', async (req, reply) => {
+    const session = getSession(req.params.id);
+    if (!session) {
+      reply.code(404);
+      return { error: 'session not found' };
+    }
+    const dirPath = req.body?.path?.trim();
+    if (!dirPath) {
+      reply.code(400);
+      return { error: 'path is required' };
+    }
+    const opts = getLaunchOptions(req.params.id) ?? {};
+    const dirs = new Set(opts.addDirs ?? []);
+    if (dirs.has(dirPath)) {
+      return { ok: true, restarted: false };
+    }
+    dirs.add(dirPath);
+    opts.addDirs = [...dirs];
+    setLaunchOptions(req.params.id, opts);
+
+    const proc = agentManager.get(req.params.id);
+    if (proc && proc.isAlive()) {
+      proc.stop();
+    }
+    return { ok: true, restarted: true };
   });
 }
