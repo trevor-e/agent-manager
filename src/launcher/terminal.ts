@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { config } from '../config.ts';
-import type { LaunchOptions } from '../db.ts';
+import type { LaunchOptions } from '../shared/types.ts';
+import { buildSessionArgs, appendLaunchOptionArgs } from './args.ts';
 
 function shellEscape(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
@@ -21,30 +22,16 @@ export type LaunchResult = {
 };
 
 function buildClaudeArgv(opts: LaunchOpts): string[] {
-  const args = ['claude'];
-  const forkFrom = opts.launchOptions?.forkFrom;
-  if (forkFrom) {
-    args.push('--fork-session', '--resume', forkFrom, '--session-id', opts.sessionId);
-    if (opts.title) args.push('--name', opts.title);
-  } else if (opts.kind === 'new') {
-    args.push('--session-id', opts.sessionId);
-    if (opts.title) args.push('--name', opts.title);
-  } else {
-    args.push('-r', opts.sessionId);
-  }
-  const lo = opts.launchOptions;
-  if (lo) {
-    if (lo.permissionMode) args.push('--permission-mode', lo.permissionMode);
-    if (lo.model) args.push('--model', lo.model);
-    if (lo.effort) args.push('--effort', lo.effort);
-    if (lo.addDirs && lo.addDirs.length > 0) args.push('--add-dir', ...lo.addDirs);
-    if (lo.worktree?.enabled) {
-      args.push('--worktree');
-      if (lo.worktree.name) args.push(lo.worktree.name);
-    }
-    if (lo.systemPrompt) args.push('--system-prompt', lo.systemPrompt);
-    if (lo.appendSystemPrompt) args.push('--append-system-prompt', lo.appendSystemPrompt);
-  }
+  const args = [
+    'claude',
+    ...buildSessionArgs({
+      sessionId: opts.sessionId,
+      isNew: opts.kind === 'new',
+      forkFrom: opts.launchOptions?.forkFrom,
+      title: opts.title,
+    }),
+  ];
+  appendLaunchOptionArgs(args, opts.launchOptions);
   return args;
 }
 

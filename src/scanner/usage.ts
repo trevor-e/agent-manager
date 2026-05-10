@@ -1,14 +1,8 @@
 import { stat, readFile } from 'node:fs/promises';
 import { getModelPricing } from './pricing.ts';
+import type { UsageTotals } from '../shared/types.ts';
 
-export type UsageTotals = {
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheCreationTokens: number;
-  totalTokens: number;
-  costUSD: number;
-};
+export type { UsageTotals } from '../shared/types.ts';
 
 type CacheEntry = { mtimeMs: number; size: number; totals: UsageTotals };
 const cache = new Map<string, CacheEntry>();

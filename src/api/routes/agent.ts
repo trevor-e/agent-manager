@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { getSession, getLaunchOptions, setLaunchOptions } from '../../db.ts';
-import type { PermissionMode } from '../../agent/types.ts';
+import type { PermissionMode } from '../../shared/types.ts';
 import type { UserContentBlock } from '../../agent/types.ts';
 import { agentManager } from '../../agent/manager.ts';
 import type { AgentEvent } from '../../agent/process.ts';
-import { PERMISSION_MODES } from './sessions.ts';
+import { PERMISSION_MODES } from '../../shared/constants.ts';
 
 export function registerAgentRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>('/api/sessions/:id/stream', async (req, reply) => {

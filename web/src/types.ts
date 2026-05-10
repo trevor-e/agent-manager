@@ -1,20 +1,10 @@
-export type DerivedState =
-  | 'launching'
-  | 'working'
-  | 'waiting'
-  | 'blocked'
-  | 'idle'
-  | 'done'
-  | 'archived';
-
-export type UsageTotals = {
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheCreationTokens: number;
-  totalTokens: number;
-  costUSD: number;
-};
+export type {
+  DerivedState,
+  PermissionMode,
+  EffortLevel,
+  LaunchOptions,
+  UsageTotals,
+} from '../../src/shared/types.ts';
 
 export type Session = {
   id: string;
@@ -37,11 +27,11 @@ export type Session = {
   linear_issue_id: string | null;
   linear_issue_identifier: string | null;
   linear_issue_url: string | null;
-  derived_state: DerivedState;
+  derived_state: import('../../src/shared/types.ts').DerivedState;
   display_name: string;
   is_running: boolean;
   web_chat_locked: boolean;
-  usage?: UsageTotals | null;
+  usage?: import('../../src/shared/types.ts').UsageTotals | null;
   tool_usage?: Record<string, number> | null;
 };
 
@@ -73,27 +63,6 @@ export type GitChanges = {
   ahead: number;
   files: FileChange[];
   warning?: string;
-};
-
-export type PermissionMode =
-  | 'default'
-  | 'acceptEdits'
-  | 'plan'
-  | 'bypassPermissions'
-  | 'auto'
-  | 'dontAsk';
-
-export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-
-export type LaunchOptions = {
-  permissionMode?: PermissionMode;
-  worktree?: { enabled: boolean; name?: string };
-  model?: string;
-  effort?: EffortLevel;
-  addDirs?: string[];
-  systemPrompt?: string;
-  appendSystemPrompt?: string;
-  linearIssueId?: string;
 };
 
 export type LinearIssue = {

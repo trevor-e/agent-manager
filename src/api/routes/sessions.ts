@@ -9,8 +9,9 @@ import {
   setUserStatus,
   setTitle,
   insertLaunchPlaceholderStmt,
-  type LaunchOptions,
 } from '../../db.ts';
+import type { LaunchOptions } from '../../shared/types.ts';
+import { PERMISSION_MODES, EFFORT_LEVELS } from '../../shared/constants.ts';
 import { runScanOnce } from '../../scanner/index.ts';
 import { launchSession } from '../../launcher/terminal.ts';
 import {
@@ -30,16 +31,6 @@ type RepoSummary = {
   total: number;
   by_state: Record<string, number>;
 };
-
-export const PERMISSION_MODES = new Set([
-  'default',
-  'acceptEdits',
-  'plan',
-  'bypassPermissions',
-  'auto',
-  'dontAsk',
-]);
-const EFFORT_LEVELS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
 
 export function registerSessionRoutes(app: FastifyInstance) {
   app.get('/api/sessions', async (req) => {

@@ -2,6 +2,9 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { config } from './config.ts';
+import type { LaunchOptions } from './shared/types.ts';
+
+export type { LaunchOptions } from './shared/types.ts';
 
 mkdirSync(dirname(config.dbPath), { recursive: true });
 
@@ -136,17 +139,6 @@ export type SessionRow = {
   updated_at: number;
 };
 
-export type LaunchOptions = {
-  permissionMode?: 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions' | 'auto' | 'dontAsk';
-  worktree?: { enabled: boolean; name?: string };
-  model?: string;
-  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-  addDirs?: string[];
-  systemPrompt?: string;
-  appendSystemPrompt?: string;
-  forkFrom?: string;
-  linearIssueId?: string;
-};
 
 export type ProcessRow = {
   pid: number;

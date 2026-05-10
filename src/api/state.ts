@@ -1,16 +1,10 @@
 import type { SessionRow } from '../db.ts';
 import { listRunningCwds, db } from '../db.ts';
 import { agentManager } from '../agent/manager.ts';
-import { computeUsage, type UsageTotals } from '../scanner/usage.ts';
+import { computeUsage } from '../scanner/usage.ts';
+import type { DerivedState, UsageTotals } from '../shared/types.ts';
 
-export type DerivedState =
-  | 'launching'
-  | 'working'
-  | 'waiting'
-  | 'blocked'
-  | 'idle'
-  | 'done'
-  | 'archived';
+export type { DerivedState } from '../shared/types.ts';
 
 export type SessionView = SessionRow & {
   derived_state: DerivedState;

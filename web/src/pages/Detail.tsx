@@ -9,25 +9,7 @@ import { computeSlots, rememberSlotNav } from '../sessionSlots';
 import type { RepoSummary, Session, SessionEvent } from '../types';
 import { useNow } from '../useNow';
 import { formatCost, formatTokens, usageTooltip } from '../format';
-
-const STATE_LABELS: Record<string, string> = {
-  launching: '🚀 launching',
-  working: '🟢 working',
-  waiting: '🟡 waiting on you',
-  blocked: '🔴 needs approval',
-  idle: '⚪ idle',
-  stale: '🌫 stale',
-  done: '✅ done',
-  archived: '📦 archived',
-};
-
-function ageStr(now: number, ms: number): string {
-  const d = now - ms;
-  if (d < 60_000) return `${Math.floor(d / 1000)}s`;
-  if (d < 3_600_000) return `${Math.floor(d / 60_000)}m`;
-  if (d < 86_400_000) return `${Math.floor(d / 3_600_000)}h`;
-  return `${Math.floor(d / 86_400_000)}d`;
-}
+import { STATE_LABELS, ageStr } from '../constants';
 
 function isInputFocused(): boolean {
   const el = document.activeElement as HTMLElement | null;

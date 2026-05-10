@@ -3,8 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { existsSync } from 'node:fs';
 import { config } from '../config.ts';
-import { db, getSession, type LaunchOptions } from '../db.ts';
+import { db, getSession } from '../db.ts';
 import { log } from '../log.ts';
+import type { LaunchOptions } from '../shared/types.ts';
+import { READ_ONLY_TOOLS } from '../shared/constants.ts';
+import { buildSessionArgs, appendLaunchOptionArgs } from '../launcher/args.ts';
 import type {
   ControlRequestEnvelope,
   ControlResponseEnvelope,
@@ -28,8 +31,6 @@ const TOOL_APPROVAL_CALLBACK = 'tool_approval';
 const AUTO_APPROVE_CALLBACK = 'auto_approve';
 
 const APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
-
-const READ_ONLY_TOOLS = ['Glob', 'Grep', 'NotebookRead', 'Read', 'Task', 'TodoWrite'];
 
 type PendingApproval = {
   approvalId: string;
@@ -97,12 +98,13 @@ export class AgentProcess extends EventEmitter {
     const isNew = !existing?.jsonl_path;
     const launchOptions = parseLaunchOptions(existing?.launch_options);
 
-    const forkFrom = launchOptions?.forkFrom;
     const args = [
       '-p',
-      ...(forkFrom
-        ? ['--fork-session', '--resume', forkFrom, '--session-id', this.sessionId]
-        : [isNew ? '--session-id' : '--resume', this.sessionId]),
+      ...buildSessionArgs({
+        sessionId: this.sessionId,
+        isNew,
+        forkFrom: launchOptions?.forkFrom,
+      }),
       '--input-format',
       'stream-json',
       '--output-format',
@@ -112,18 +114,12 @@ export class AgentProcess extends EventEmitter {
       '--verbose',
       '--permission-prompt-tool',
       'stdio',
-      '--permission-mode',
-      launchOptions?.permissionMode ?? 'bypassPermissions',
     ];
-    if (launchOptions?.model) args.push('--model', launchOptions.model);
-    if (launchOptions?.effort) args.push('--effort', launchOptions.effort);
-    if (launchOptions?.addDirs?.length) args.push('--add-dir', ...launchOptions.addDirs);
-    if (launchOptions?.worktree?.enabled) {
-      args.push('--worktree');
-      if (launchOptions.worktree.name) args.push(launchOptions.worktree.name);
-    }
-    if (launchOptions?.systemPrompt) args.push('--system-prompt', launchOptions.systemPrompt);
-    if (launchOptions?.appendSystemPrompt) args.push('--append-system-prompt', launchOptions.appendSystemPrompt);
+    const effectiveOpts = {
+      ...launchOptions,
+      permissionMode: launchOptions?.permissionMode ?? 'bypassPermissions' as const,
+    };
+    appendLaunchOptionArgs(args, effectiveOpts);
 
     this.child = spawn(config.claudeBin, args, {
       cwd: this.cwd,
