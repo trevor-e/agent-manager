@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { api } from '../api';
 import { notify } from '../notifications';
-import type { Session, SessionEvent } from '../types';
+import type { RepoSummary, Session, SessionEvent } from '../types';
 import {
   type Bubble,
   type ToolUseBubble,
@@ -14,6 +14,7 @@ import {
   type Attachment,
   processAttachmentFiles,
 } from './composer/attachments';
+import { RepoSelect } from './RepoSelect';
 
 type AgentEvent =
   | { type: 'attached'; pendingApprovals: Approval[] }
@@ -26,9 +27,11 @@ type AgentEvent =
 export function Composer({
   session,
   initialEvents,
+  repos = [],
 }: {
   session: Session;
   initialEvents: SessionEvent[];
+  repos?: RepoSummary[];
 }) {
   const [bubbles, setBubbles] = useState<Bubble[]>(() => eventsToBubbles(initialEvents));
   const [approvals, setApprovals] = useState<Approval[]>([]);
@@ -41,11 +44,14 @@ export function Composer({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
+  const [addDirOpen, setAddDirOpen] = useState(false);
+  const [addDirValue, setAddDirValue] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bubbleIdCounter = useRef(0);
   const attachmentIdCounter = useRef(0);
   const esRef = useRef<EventSource | null>(null);
+  const reconnectRef = useRef(0);
   // Tracks the currently streaming assistant message id and its accumulated text,
   // so content_block_delta events can incrementally grow the bubble.
   const streamingMessageIdRef = useRef<string | null>(null);
@@ -108,7 +114,12 @@ export function Composer({
     setWorking(true);
   }
 
-  useEffect(() => {
+  function reconnectSSE() {
+    if (esRef.current) {
+      esRef.current.close();
+      esRef.current = null;
+    }
+    reconnectRef.current++;
     const url = `/api/sessions/${session.id}/stream`;
     const es = new EventSource(url);
     esRef.current = es;
@@ -123,9 +134,15 @@ export function Composer({
       }
       handleEvent(ev);
     };
+  }
+
+  useEffect(() => {
+    reconnectSSE();
     return () => {
-      es.close();
-      esRef.current = null;
+      if (esRef.current) {
+        esRef.current.close();
+        esRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id]);
@@ -398,6 +415,21 @@ export function Composer({
     }
   }
 
+  async function addDirectory(path: string) {
+    if (!path.trim()) return;
+    setAddDirOpen(false);
+    setAddDirValue('');
+    addBubble({ kind: 'system', text: `adding ${path} to context — agent will restart…` } as Bubble);
+    try {
+      const resp = await api.addDir(session.id, path.trim());
+      if (resp.restarted) {
+        setTimeout(() => reconnectSSE(), 1000);
+      }
+    } catch (e) {
+      addBubble({ kind: 'system', text: `failed to add directory: ${(e as Error).message}` } as Bubble);
+    }
+  }
+
   return (
     <div
       className={'composer' + (dragOver ? ' composer-dragover' : '')}
@@ -431,10 +463,26 @@ export function Composer({
         <button
           className="quick-action"
           disabled={pending}
-          onClick={() => sendPrompt('commit the changes')}
-          title="Send: commit the changes"
+          onClick={() => sendPrompt('review the diff of your changes for any bugs, issues, or things I should know about')}
+          title="Send: review the diff of your changes"
         >
-          Commit changes
+          Review changes
+        </button>
+        <button
+          className="quick-action"
+          disabled={pending}
+          onClick={() => sendPrompt('commit and push the changes')}
+          title="Send: commit and push the changes"
+        >
+          Commit &amp; push
+        </button>
+        <button
+          className="quick-action"
+          disabled={pending}
+          onClick={() => sendPrompt('create a draft pull request for these changes')}
+          title="Send: create a draft pull request"
+        >
+          Create PR
         </button>
         <button
           className="quick-action"
