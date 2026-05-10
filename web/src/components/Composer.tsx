@@ -501,6 +501,14 @@ export function Composer({
         </button>
         <button
           className="quick-action"
+          disabled={pending}
+          onClick={() => sendPrompt('Review the last ~20 messages in this conversation for recurring issues, corrections you received, or patterns worth codifying. Suggest specific additions or edits to CLAUDE.md — but do NOT apply them yet. Just list the proposed changes and wait for my approval.')}
+          title="Suggest CLAUDE.md updates based on recent chat"
+        >
+          Update CLAUDE.md
+        </button>
+        <button
+          className="quick-action"
           onClick={() => { setAddDirOpen(v => !v); setAddDirValue(''); }}
           title="Add another repo/directory to this session's context"
         >
