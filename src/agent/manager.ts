@@ -27,6 +27,12 @@ class AgentManager {
         for (const l of entry!.listeners) l(ev);
         if (ev.type === 'exit') this.cleanup(opts.sessionId);
       });
+      process.on('error', (err: Error) => {
+        const errorEvent: AgentEvent = { type: 'error', message: err.message };
+        entry!.recentEvents.push(errorEvent);
+        for (const l of entry!.listeners) l(errorEvent);
+        this.cleanup(opts.sessionId);
+      });
       process.start();
     }
     if (entry.idleTimer) {

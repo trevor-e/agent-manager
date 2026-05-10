@@ -1,4 +1,5 @@
 import { readdir, stat, open } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { upsertSession, db } from '../db.ts';
 import { config } from '../config.ts';
@@ -298,5 +299,21 @@ export async function scanJsonl(): Promise<{ scanned: number; updated: number }>
 }
 
 export function decodeProjectDir(dirName: string): string {
-  return '/' + dirName.replace(/^-/, '').replaceAll('-', '/');
+  const segments = dirName.replace(/^-/, '').split('-');
+  const resolved = resolveSegments('/', segments);
+  if (resolved) return resolved;
+  return '/' + segments.join('/');
+}
+
+function resolveSegments(base: string, segments: string[]): string | null {
+  if (segments.length === 0) return base;
+  for (let take = segments.length; take >= 1; take--) {
+    const name = segments.slice(0, take).join('-');
+    const candidate = join(base, name);
+    if (existsSync(candidate)) {
+      const rest = resolveSegments(candidate, segments.slice(take));
+      if (rest) return rest;
+    }
+  }
+  return null;
 }

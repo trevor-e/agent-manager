@@ -22,7 +22,8 @@ type AgentEvent =
   | { type: 'approval_request'; approvalId: string; toolName: string; input: any }
   | { type: 'approval_resolved'; approvalId: string; decision: 'approve' | 'deny'; reason?: string }
   | { type: 'stderr'; line: string }
-  | { type: 'exit'; code: number | null; signal: string | null };
+  | { type: 'exit'; code: number | null; signal: string | null }
+  | { type: 'error'; message: string };
 
 export function Composer({
   session,
@@ -234,6 +235,13 @@ export function Composer({
         setWorking(false);
         streamingMessageIdRef.current = null;
         notify(`Session finished`, session.display_name ?? 'Session');
+        break;
+      case 'error':
+        addBubble({ kind: 'system', text: `agent error: ${ev.message}` } as Bubble);
+        setConnected(false);
+        setWorking(false);
+        streamingMessageIdRef.current = null;
+        notify(`Agent error`, ev.message);
         break;
     }
   }

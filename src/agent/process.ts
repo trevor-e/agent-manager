@@ -48,7 +48,8 @@ export type AgentEvent =
   | { type: 'approval_request'; approvalId: string; toolName: string; input: unknown }
   | { type: 'approval_resolved'; approvalId: string; decision: 'approve' | 'deny'; reason?: string }
   | { type: 'stderr'; line: string }
-  | { type: 'exit'; code: number | null; signal: NodeJS.Signals | null };
+  | { type: 'exit'; code: number | null; signal: NodeJS.Signals | null }
+  | { type: 'error'; message: string };
 
 export class AgentProcess extends EventEmitter {
   readonly sessionId: string;
@@ -69,6 +70,22 @@ export class AgentProcess extends EventEmitter {
 
   start() {
     if (this.child) return;
+
+    if (!existsSync(this.cwd)) {
+      const err = new Error(`Working directory does not exist: ${this.cwd}`);
+      log('error', `agent:${this.sessionId}`, 'cwd missing', { cwd: this.cwd });
+      this.exited = true;
+      this.emit('error', err);
+      return;
+    }
+
+    if (!existsSync(config.claudeBin)) {
+      const err = new Error(`Claude binary not found: ${config.claudeBin}`);
+      log('error', `agent:${this.sessionId}`, 'claude bin missing', { bin: config.claudeBin });
+      this.exited = true;
+      this.emit('error', err);
+      return;
+    }
 
     // If the session has never been written to disk (placeholder row), use
     // --session-id to create a fresh session with that UUID. Otherwise --resume.
