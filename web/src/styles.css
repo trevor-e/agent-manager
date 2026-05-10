@@ -25,7 +25,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue"
 .pad { padding: 24px; }
 .error { color: var(--red); padding: 12px; background: rgba(248,81,73,0.08); border: 1px solid rgba(248,81,73,0.3); border-radius: 6px; }
 
-.app { display: flex; flex-direction: column; min-height: 100vh; }
+.app { display: flex; flex-direction: column; height: 100vh; }
 .topbar {
   display: flex; align-items: center; gap: 12px;
   padding: 10px 18px; border-bottom: 1px solid var(--border);
@@ -38,7 +38,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue"
 .topbar-link:hover { color: var(--fg); background: var(--bg3); }
 .topbar-link-active { color: var(--purple); }
 
-main { padding: 18px; max-width: 1400px; margin: 0 auto; width: 100%; }
+main { padding: 18px; max-width: 1400px; margin: 0 auto; width: 100%; flex: 1; min-height: 0; overflow: auto; }
 
 .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .chips { display: flex; gap: 6px; }
@@ -171,7 +171,7 @@ button.green .kbd-hint { border-color: rgba(63,185,80,0.3); color: var(--green);
 .modal details[open] { padding-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
 
-.detail { display: flex; flex-direction: column; gap: 18px; }
+.detail { display: flex; flex-direction: column; gap: 18px; height: 100%; min-height: 0; }
 .detail-header { display: flex; align-items: flex-start; gap: 16px; }
 .state-pill { font-size: 12px; padding: 2px 10px; border-radius: 999px; background: var(--bg2); color: var(--fg2); display: inline-block; margin-bottom: 6px; }
 .title { font-size: 22px; margin: 0; cursor: pointer; }
@@ -181,12 +181,12 @@ button.green .kbd-hint { border-color: rgba(63,185,80,0.3); color: var(--green);
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .actions button { white-space: nowrap; }
 
-.detail-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 18px; align-items: start; }
+.detail-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 18px; align-items: stretch; flex: 1; min-height: 0; }
 
 .session-sidebar {
   background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
   padding: 10px; display: flex; flex-direction: column; gap: 8px;
-  position: sticky; top: 60px; max-height: calc(100vh - 80px); overflow-y: auto;
+  min-height: 0; overflow-y: auto;
 }
 .sidebar-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -250,7 +250,7 @@ button .kbd-hint { background: transparent; border-color: rgba(88,166,255,0.25);
 .composer {
   background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
   padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
-  min-width: 0;
+  min-width: 0; min-height: 0; overflow: hidden;
 }
 .composer-locked {
   background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
@@ -271,7 +271,7 @@ button .kbd-hint { background: transparent; border-color: rgba(88,166,255,0.25);
 .dot-off { background: var(--gray); }
 
 .bubbles {
-  max-height: 70vh; overflow-y: auto;
+  flex: 1; min-height: 0; overflow-y: auto;
   display: flex; flex-direction: column; gap: 8px;
   padding: 4px 2px;
 }
@@ -567,7 +567,7 @@ button .kbd-hint { background: transparent; border-color: rgba(88,166,255,0.25);
 .git-view {
   background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
   padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;
-  min-width: 0;
+  min-width: 0; min-height: 0; overflow-y: auto;
 }
 .git-view-header { display: flex; align-items: center; gap: 8px; }
 .git-view-tabs { display: flex; gap: 4px; }
