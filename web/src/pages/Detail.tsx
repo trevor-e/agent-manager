@@ -138,7 +138,7 @@ export function DetailPage({ id }: { id: string }) {
     const currentId = session.id;
     function onKey(e: KeyboardEvent) {
       const meta = e.metaKey || e.ctrlKey;
-      if (!meta) return;
+      if (!meta && !e.altKey) return;
       if (editing) return;
       const key = e.key.toLowerCase();
       if (!e.shiftKey && !e.altKey && key === 'e') {
@@ -164,8 +164,9 @@ export function DetailPage({ id }: { id: string }) {
         fork();
         return;
       }
-      if (!e.shiftKey && !e.altKey && /^[1-9]$/.test(e.key)) {
-        const slot = Number(e.key);
+      const digitCode = e.code?.match(/^Digit([1-9])$/);
+      if (!e.shiftKey && e.altKey && !meta && digitCode) {
+        const slot = Number(digitCode[1]);
         const targetId = sessionBySlot.get(slot);
         if (!targetId) return;
         e.preventDefault();

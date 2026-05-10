@@ -51,7 +51,7 @@ function SidebarItem({
       <div className="sidebar-item-title">{session.display_name}</div>
       <div className="sidebar-item-meta muted small">
         {slot !== undefined ? (
-          <kbd className="sidebar-item-kbd">⌘{slot}</kbd>
+          <kbd className="sidebar-item-kbd">⌥{slot}</kbd>
         ) : (
           <span className="sidebar-item-kbd-placeholder" />
         )}
