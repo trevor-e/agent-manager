@@ -216,8 +216,23 @@ button.green .kbd-hint { border-color: rgba(63,185,80,0.3); color: var(--green);
 .title:hover { color: var(--accent); }
 .title-input { font-size: 22px; background: var(--bg3); border: 1px solid var(--accent); color: var(--fg); padding: 4px 8px; border-radius: 4px; min-width: 400px; }
 .meta-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; word-break: break-all; }
-.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.age-value { display: inline-block; min-width: 2.2em; text-align: right; font-variant-numeric: tabular-nums; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .actions button { white-space: nowrap; }
+.action-sep { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
+.action-more { position: relative; }
+.action-more-menu {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 10;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px; min-width: 160px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.action-more-menu button {
+  display: block; width: 100%; text-align: left;
+  background: transparent; border: none; color: var(--fg);
+  padding: 6px 10px; border-radius: 4px; font-size: 12px;
+}
+.action-more-menu button:hover { background: var(--bg3); }
 
 .detail-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 18px; align-items: stretch; flex: 1; min-height: 0; }
 

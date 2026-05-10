@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { navigate } from '../App';
 import { Composer } from '../components/Composer';
@@ -28,7 +28,18 @@ export function DetailPage({ id }: { id: string }) {
   const [activeSessions, setActiveSessions] = useState<Session[]>([]);
   const [activeLoaded, setActiveLoaded] = useState(false);
   const [view, setView] = useState<'conversation' | 'diff'>('conversation');
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
   const now = useNow();
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    function onClickOutside(e: MouseEvent) {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [moreOpen]);
 
   async function refresh() {
     try {
@@ -73,6 +84,12 @@ export function DetailPage({ id }: { id: string }) {
   }, []);
 
   const session = data?.session;
+
+  useEffect(() => {
+    if (session) document.title = `${session.display_name} — claude-manager`;
+    return () => { document.title = 'claude-manager'; };
+  }, [session?.display_name]);
+
   const sortedOthers = useMemo(() => {
     if (!session) return [];
     return sortSidebarSessions(session.id, session.repo_name, activeSessions);
@@ -213,7 +230,7 @@ export function DetailPage({ id }: { id: string }) {
               </>
             )}
             <span>•</span>
-            <span>last activity {ageStr(now, session.last_event_at)} ago</span>
+            <span>last activity <span className="age-value">{ageStr(now, session.last_event_at)}</span> ago</span>
             {session.usage && session.usage.totalTokens > 0 && (
               <>
                 <span>•</span>
@@ -251,22 +268,29 @@ export function DetailPage({ id }: { id: string }) {
         </div>
         <div className="grow" />
         <div className="actions">
-          <button className="primary" onClick={() => setLaunchOpen(true)} title="New session">
-            + New session <kbd className="kbd-hint">⌘E</kbd>
-          </button>
           <button
-            className="green"
             onClick={() => setView(v => (v === 'conversation' ? 'diff' : 'conversation'))}
             title="Toggle conversation / diff view"
           >
             {view === 'conversation' ? 'View changes' : 'View chat'}
             <kbd className="kbd-hint">⌘B</kbd>
           </button>
+          <span className="action-sep" />
           <button onClick={fork} title="Fork this session into a new one">Fork<kbd className="kbd-hint">⇧⌘F</kbd></button>
-          <button onClick={resume}>Resume in Ghostty</button>
-          <button className="ghost" onClick={markDone} title="Toggle done">
+          <button onClick={markDone} title="Toggle done">
             {session.user_status === 'done' ? 'Mark active' : 'Mark done'}
             <kbd className="kbd-hint">⌘.</kbd>
+          </button>
+          <div className="action-more" ref={moreRef}>
+            <button onClick={() => setMoreOpen(v => !v)} title="More actions">···</button>
+            {moreOpen && (
+              <div className="action-more-menu">
+                <button onClick={() => { resume(); setMoreOpen(false); }}>Resume in Ghostty</button>
+              </div>
+            )}
+          </div>
+          <button className="primary" onClick={() => setLaunchOpen(true)} title="New session">
+            + New session <kbd className="kbd-hint">⌘E</kbd>
           </button>
         </div>
       </div>
