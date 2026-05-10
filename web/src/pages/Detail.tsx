@@ -4,6 +4,7 @@ import { navigate } from '../App';
 import { Composer } from '../components/Composer';
 import { GitView } from '../components/GitView';
 import { LaunchModal } from '../components/LaunchModal';
+import { RepoSelect } from '../components/RepoSelect';
 import { SessionSidebar, sortSidebarSessions } from '../components/SessionSidebar';
 import { computeSlots, rememberSlotNav } from '../sessionSlots';
 import type { RepoSummary, Session, SessionEvent } from '../types';
@@ -24,6 +25,8 @@ export function DetailPage({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [launchOpen, setLaunchOpen] = useState(false);
+  const [addDirOpen, setAddDirOpen] = useState(false);
+  const [addDirValue, setAddDirValue] = useState('');
   const [repos, setRepos] = useState<RepoSummary[]>([]);
   const [activeSessions, setActiveSessions] = useState<Session[]>([]);
   const [activeLoaded, setActiveLoaded] = useState(false);
@@ -223,6 +226,41 @@ export function DetailPage({ id }: { id: string }) {
             <span className="mono">{session.id}</span>
             <span>•</span>
             <span className="mono">{session.project_path}</span>
+            <span className="add-dir-wrapper">
+              <button
+                className="add-dir-btn"
+                title="Add another directory to this session"
+                onClick={() => { setAddDirOpen(v => !v); setAddDirValue(''); }}
+              >
+                {addDirOpen ? '×' : '+'}
+              </button>
+              {addDirOpen && (
+                <div
+                  className="add-dir-popover"
+                  onKeyDown={e => { if (e.key === 'Escape') { setAddDirOpen(false); setAddDirValue(''); } }}
+                >
+                  <RepoSelect
+                    repos={repos.filter(r => r.project_path !== session.project_path)}
+                    value={addDirValue}
+                    onChange={setAddDirValue}
+                    autoFocus
+                    placeholder="pick or type a directory path"
+                  />
+                  <button
+                    className="primary"
+                    disabled={!addDirValue.trim()}
+                    onClick={async () => {
+                      const path = addDirValue.trim();
+                      setAddDirOpen(false);
+                      setAddDirValue('');
+                      await api.addDir(session.id, path);
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+              )}
+            </span>
             {session.git_branch && (
               <>
                 <span>•</span>
@@ -240,17 +278,18 @@ export function DetailPage({ id }: { id: string }) {
                 </span>
               </>
             )}
+            {session.tool_usage && Object.keys(session.tool_usage).length > 0 && (
+              <>
+                <span>•</span>
+                {Object.entries(session.tool_usage)
+                  .sort(([, a], [, b]) => b - a)
+                  .slice(0, 10)
+                  .map(([name, count]) => (
+                    <span key={name} className="usage-pill">{name}: {count}</span>
+                  ))}
+              </>
+            )}
           </div>
-          {session.tool_usage && Object.keys(session.tool_usage).length > 0 && (
-            <div className="meta-row" style={{ gap: '4px', marginTop: '4px' }}>
-              {Object.entries(session.tool_usage)
-                .sort(([, a], [, b]) => b - a)
-                .slice(0, 10)
-                .map(([name, count]) => (
-                  <span key={name} className="usage-pill">{name}: {count}</span>
-                ))}
-            </div>
-          )}
           {(session.linear_issue_identifier || session.pr_url) && (
             <div className="pr-row" style={{ display: 'flex', gap: '8px' }}>
               {session.linear_issue_identifier && session.linear_issue_url && (
@@ -275,7 +314,6 @@ export function DetailPage({ id }: { id: string }) {
             {view === 'conversation' ? 'View changes' : 'View chat'}
             <kbd className="kbd-hint">⌘B</kbd>
           </button>
-          <span className="action-sep" />
           <button onClick={fork} title="Fork this session into a new one">Fork<kbd className="kbd-hint">⇧⌘F</kbd></button>
           <button onClick={markDone} title="Toggle done">
             {session.user_status === 'done' ? 'Mark active' : 'Mark done'}
@@ -297,7 +335,7 @@ export function DetailPage({ id }: { id: string }) {
 
       <div className="detail-body">
         {view === 'conversation' ? (
-          <Composer key={session.id} session={session} initialEvents={events} repos={repos} />
+          <Composer key={session.id} session={session} initialEvents={events} />
         ) : (
           <GitView sessionId={session.id} />
         )}

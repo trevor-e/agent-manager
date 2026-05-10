@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
-import { api } from '../api';
-import type { RepoSummary, Session, SessionEvent } from '../types';
+import type { Session, SessionEvent } from '../types';
 import { type Bubble, type ToolUseBubble, BubbleRow } from './Bubble';
 import { ApprovalModal, type ResolveOpts } from './composer/approvals';
 import { type Attachment, processAttachmentFiles } from './composer/attachments';
@@ -10,11 +9,9 @@ import { useAgentStream } from '../hooks/useAgentStream';
 export function Composer({
   session,
   initialEvents,
-  repos = [],
 }: {
   session: Session;
   initialEvents: SessionEvent[];
-  repos?: RepoSummary[];
 }) {
   const agent = useAgentStream(session, initialEvents);
   const [draft, setDraft] = useState('');
@@ -103,18 +100,6 @@ export function Composer({
     }
   }
 
-  async function addDirectory(path: string) {
-    if (!path.trim()) return;
-    agent.addBubble({ kind: 'system', text: `adding ${path} to context — agent will restart…` } as Bubble);
-    try {
-      const resp = await api.addDir(session.id, path.trim());
-      if (resp.restarted) {
-        setTimeout(() => agent.reconnectSSE(), 1000);
-      }
-    } catch (e) {
-      agent.addBubble({ kind: 'system', text: `failed to add directory: ${(e as Error).message}` } as Bubble);
-    }
-  }
 
   return (
     <div
@@ -147,11 +132,8 @@ export function Composer({
 
       <QuickActions
         pending={agent.pending}
-        session={session}
-        repos={repos}
         onSendPrompt={agent.sendPrompt}
         onEnterPlanMode={agent.enterPlanMode}
-        onAddDirectory={addDirectory}
       />
 
       {(attachments.length > 0 || attachError) && (
