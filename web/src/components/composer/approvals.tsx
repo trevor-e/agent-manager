@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type KeyboardEvent } from 'react';
 import { detectDanger } from '../../dangerDetect';
 import type { PermissionMode } from '../../types';
 import { ToolInputView } from '../Bubble';
 import { Markdown } from '../Markdown';
+
+const enterOnly = (e: KeyboardEvent) => { if (e.key !== 'Enter') e.preventDefault(); };
 
 export type Approval = { approvalId: string; toolName: string; input: any };
 
@@ -45,8 +47,8 @@ export function ApprovalModal({
           <ToolInputView input={approval.input} toolName={approval.toolName} />
         </div>
         <div className="modal-actions">
-          <button className="ghost" onClick={() => onResolve('deny')}>Deny</button>
-          <button className={danger.dangerous ? '' : 'primary'} autoFocus={!danger.dangerous} onClick={() => onResolve('approve')}>
+          <button className="ghost" onKeyDown={enterOnly} onClick={() => onResolve('deny')}>Deny</button>
+          <button className={danger.dangerous ? '' : 'primary'} autoFocus={!danger.dangerous} onKeyDown={enterOnly} onClick={() => onResolve('approve')}>
             Approve
           </button>
         </div>
@@ -75,16 +77,16 @@ function ExitPlanModeModal({
           {plan ? <Markdown>{plan}</Markdown> : <em className="muted">(empty plan)</em>}
         </div>
         <div className="modal-actions plan-actions">
-          <button className="ghost" onClick={() => onResolve('deny', { reason: 'keep planning' })}>
+          <button className="ghost" onKeyDown={enterOnly} onClick={() => onResolve('deny', { reason: 'keep planning' })}>
             Keep planning
           </button>
-          <button onClick={() => accept('default')} title="Accept the plan and ask before each tool">
+          <button onKeyDown={enterOnly} onClick={() => accept('default')} title="Accept the plan and ask before each tool">
             Accept → default
           </button>
-          <button onClick={() => accept('acceptEdits')} title="Accept the plan and auto-approve edits (still ask for shell etc.)">
+          <button onKeyDown={enterOnly} onClick={() => accept('acceptEdits')} title="Accept the plan and auto-approve edits (still ask for shell etc.)">
             Accept → accept edits
           </button>
-          <button className="primary" autoFocus onClick={() => accept('bypassPermissions')} title="Accept the plan and auto-approve everything">
+          <button className="primary" autoFocus onKeyDown={enterOnly} onClick={() => accept('bypassPermissions')} title="Accept the plan and auto-approve everything">
             Accept → bypass
           </button>
         </div>
@@ -156,6 +158,7 @@ function AskUserQuestionModal({
                     key={oi}
                     type="button"
                     className={'question-option ' + (selected ? 'question-option-selected' : '')}
+                    onKeyDown={enterOnly}
                     onClick={() => toggle(q, opt.label)}
                   >
                     <div className="question-option-label">{opt.label}</div>
@@ -172,8 +175,8 @@ function AskUserQuestionModal({
           </div>
         ))}
         <div className="modal-actions">
-          <button className="ghost" onClick={() => onResolve('deny')}>Skip</button>
-          <button className="primary" disabled={!allAnswered} onClick={submit}>
+          <button className="ghost" onKeyDown={enterOnly} onClick={() => onResolve('deny')}>Skip</button>
+          <button className="primary" disabled={!allAnswered} onKeyDown={enterOnly} onClick={submit}>
             Submit answers
           </button>
         </div>
