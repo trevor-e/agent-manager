@@ -6,7 +6,6 @@ import { config } from '../config.ts';
 import { db, getSession } from '../db.ts';
 import { log } from '../log.ts';
 import type { LaunchOptions } from '../shared/types.ts';
-import { READ_ONLY_TOOLS } from '../shared/constants.ts';
 import { buildSessionArgs, appendLaunchOptionArgs } from '../launcher/args.ts';
 import type {
   ControlRequestEnvelope,
@@ -26,9 +25,6 @@ function parseLaunchOptions(raw: string | null | undefined): LaunchOptions | nul
     return null;
   }
 }
-
-const TOOL_APPROVAL_CALLBACK = 'tool_approval';
-const AUTO_APPROVE_CALLBACK = 'auto_approve';
 
 const APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -115,10 +111,7 @@ export class AgentProcess extends EventEmitter {
       '--permission-prompt-tool',
       'stdio',
     ];
-    const effectiveOpts = {
-      ...launchOptions,
-      permissionMode: launchOptions?.permissionMode ?? 'bypassPermissions' as const,
-    };
+    const effectiveOpts = { ...launchOptions };
     appendLaunchOptionArgs(args, effectiveOpts);
 
     this.child = spawn(config.claudeBin, args, {
@@ -142,19 +135,7 @@ export class AgentProcess extends EventEmitter {
   }
 
   private async sendInitialize() {
-    const hooks = {
-      PreToolUse: [
-        {
-          matcher: `^(?!(${READ_ONLY_TOOLS.join('|')})$).*`,
-          hookCallbackIds: [TOOL_APPROVAL_CALLBACK],
-        },
-        {
-          matcher: `^(${READ_ONLY_TOOLS.join('|')})$`,
-          hookCallbackIds: [AUTO_APPROVE_CALLBACK],
-        },
-      ],
-    };
-    await this.sendControl({ subtype: 'initialize', hooks });
+    await this.sendControl({ subtype: 'initialize' });
   }
 
   // -------- outgoing -------- //
@@ -288,8 +269,6 @@ export class AgentProcess extends EventEmitter {
     const req = parsed.request as { subtype: string; [k: string]: unknown };
     if (req.subtype === 'can_use_tool') {
       this.handleCanUseTool(parsed.request_id, req as any);
-    } else if (req.subtype === 'hook_callback') {
-      this.handleHookCallback(parsed.request_id, req as any);
     }
   }
 
@@ -335,44 +314,6 @@ export class AgentProcess extends EventEmitter {
         });
       }
     }, APPROVAL_TIMEOUT_MS).unref?.();
-  }
-
-  private handleHookCallback(
-    requestId: string,
-    req: { callback_id: string; input: unknown; tool_use_id?: string }
-  ) {
-    if (req.callback_id === AUTO_APPROVE_CALLBACK) {
-      this.sendControlResponse({
-        type: 'control_response',
-        response: {
-          subtype: 'success',
-          request_id: requestId,
-          response: {
-            hookSpecificOutput: {
-              hookEventName: 'PreToolUse',
-              permissionDecision: 'allow',
-              permissionDecisionReason: 'Read-only tool, auto-approved',
-            },
-          },
-        },
-      });
-      return;
-    }
-    // tool_approval (or any other callback we registered): forward to canusetool by replying "ask"
-    this.sendControlResponse({
-      type: 'control_response',
-      response: {
-        subtype: 'success',
-        request_id: requestId,
-        response: {
-          hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
-            permissionDecision: 'ask',
-            permissionDecisionReason: 'Forwarding to claude-manager approval UI',
-          },
-        },
-      },
-    });
   }
 
   private onExit(code: number | null, signal: NodeJS.Signals | null) {
