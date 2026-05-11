@@ -36,6 +36,14 @@ export function QuickActions({
       <button
         className="quick-action"
         disabled={pending}
+        onClick={() => onSendPrompt("Check the PR review comments for any recent bot feedback (Cursor, Sentry, codecov, etc.). Summarize what the bots flagged, then give your honest assessment of each point — which ones are worth addressing and which are noise. Don't blindly follow bot suggestions; think critically about whether each suggestion actually improves the code.")}
+        title="Review bot feedback on the PR"
+      >
+        Review bot feedback
+      </button>
+      <button
+        className="quick-action"
+        disabled={pending}
         onClick={() => onSendPrompt("how's it going?")}
         title="Send: how's it going?"
       >
