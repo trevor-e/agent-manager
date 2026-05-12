@@ -22,6 +22,7 @@ export function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const attachmentIdCounter = useRef(0);
   const isNearBottom = useRef(true);
+  const historyPos = useRef(-1);
 
   const showCoexistWarning = session.is_running;
 
@@ -66,6 +67,7 @@ export function Composer({
     if (!draft.trim() && attachments.length === 0) return;
     const text = draft;
     const imgs = attachments;
+    historyPos.current = -1;
     setDraft('');
     setAttachments([]);
     setAttachError(null);
@@ -180,6 +182,27 @@ export function Composer({
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
               e.preventDefault();
               send();
+            }
+            if (e.key === 'ArrowUp') {
+              const history = agent.bubbles.filter(b => b.kind === 'user').map(b => b.text);
+              if (!history.length) return;
+              if (historyPos.current === -1 && draft.trim()) return;
+              e.preventDefault();
+              historyPos.current = historyPos.current === -1
+                ? history.length - 1
+                : Math.max(0, historyPos.current - 1);
+              setDraft(history[historyPos.current]);
+            }
+            if (e.key === 'ArrowDown' && historyPos.current !== -1) {
+              e.preventDefault();
+              const history = agent.bubbles.filter(b => b.kind === 'user').map(b => b.text);
+              if (historyPos.current < history.length - 1) {
+                historyPos.current++;
+                setDraft(history[historyPos.current]);
+              } else {
+                historyPos.current = -1;
+                setDraft('');
+              }
             }
           }}
           placeholder="message claude…  (⌘+Enter to send, drop images to attach)"
