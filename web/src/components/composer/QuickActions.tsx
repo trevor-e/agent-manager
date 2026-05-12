@@ -44,6 +44,14 @@ export function QuickActions({
       <button
         className="quick-action"
         disabled={pending}
+        onClick={() => onSendPrompt("Check the GitHub Actions status for the current PR. If any checks failed, investigate the failure logs and suggest fixes.")}
+        title="Check GitHub Actions status for the PR"
+      >
+        Check CI status
+      </button>
+      <button
+        className="quick-action"
+        disabled={pending}
         onClick={() => onSendPrompt("how's it going?")}
         title="Send: how's it going?"
       >
