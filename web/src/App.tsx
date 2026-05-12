@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { KeysModal } from './components/KeysModal';
+import { McpStatus } from './components/McpStatus';
 import { requestNotificationPermission } from './notifications';
 import { ListPage } from './pages/List';
 import { DetailPage } from './pages/Detail';
@@ -66,9 +67,9 @@ export function App() {
             Linear
           </a>
         )}
+        <button className="ghost topbar-link" onClick={() => setKeysOpen(true)}>Keys</button>
+        <McpStatus />
         <div className="grow" />
-        <span className="muted">{route.name === 'detail' ? `session ${route.id.slice(0, 8)}` : ''}</span>
-        <button className="ghost" onClick={() => setKeysOpen(true)}>Keys</button>
       </header>
       <main>
         {route.name === 'list' ? <ListPage /> : route.name === 'linear' ? <LinearPage /> : <DetailPage id={route.id} />}

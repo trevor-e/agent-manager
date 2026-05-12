@@ -81,6 +81,12 @@ export const api = {
   },
   linearProjects: () => jget<{ projects: LinearProject[] }>('/api/linear/projects'),
 
+  getMcp: (cwd?: string) => {
+    const qs = new URLSearchParams();
+    if (cwd) qs.set('cwd', cwd);
+    return jget<{ servers: Array<{ name: string; url: string; status: 'connected' | 'needs_auth' | 'failed' }> }>(`/api/mcp?${qs.toString()}`);
+  },
+
   getKeys: () => jget<{ keys: Record<string, { set: boolean; source: string | null; masked: string | null }> }>('/api/keys'),
   setKeys: (keys: Record<string, string | null>) => jsend<{ ok: boolean }>('/api/keys', 'PUT', keys),
 };

@@ -719,3 +719,32 @@ button .kbd-hint { background: transparent; border-color: rgba(88,166,255,0.25);
 
 .linear-issue-row .row-actions { visibility: hidden; }
 .linear-issue-row:hover .row-actions { visibility: visible; }
+
+/* ---- MCP Status ---- */
+.mcp-badge { font-size: 11px; font-weight: 600; }
+.mcp-modal { width: 720px; }
+.mcp-modal-header { display: flex; align-items: center; justify-content: space-between; }
+.mcp-modal-header h3 { margin: 0; }
+.mcp-refresh { font-size: 12px; }
+.mcp-list { display: flex; flex-direction: column; gap: 1px; max-height: 60vh; overflow-y: auto; }
+.mcp-server {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; padding: 6px 8px; border-radius: 4px;
+  background: var(--bg3);
+}
+.mcp-icon { font-size: 8px; flex-shrink: 0; }
+.mcp-name { white-space: nowrap; }
+.mcp-url { color: var(--fg3); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.mcp-status-label { font-size: 11px; white-space: nowrap; }
+.mcp-connected .mcp-icon, .mcp-connected.mcp-status-label, .mcp-badge.mcp-connected { color: var(--green); }
+.mcp-needs-auth .mcp-icon, .mcp-needs-auth.mcp-status-label, .mcp-badge.mcp-needs-auth { color: var(--yellow); }
+.mcp-failed .mcp-icon, .mcp-failed.mcp-status-label, .mcp-badge.mcp-failed { color: var(--red); }
+.mcp-auth-btn {
+  font-size: 11px; padding: 2px 8px; white-space: nowrap;
+  background: rgba(210,153,34,0.12); color: var(--yellow);
+  border: 1px solid rgba(210,153,34,0.3); border-radius: 4px;
+  cursor: pointer;
+}
+.mcp-auth-btn:hover { background: rgba(210,153,34,0.2); }
+.mcp-hint { font-size: 12px; color: var(--fg2); margin: 4px 0 0; }
+.mcp-hint code { background: var(--bg3); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
