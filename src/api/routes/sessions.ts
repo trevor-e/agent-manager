@@ -73,7 +73,7 @@ export function registerSessionRoutes(app: FastifyInstance) {
       view.tool_usage = await computeToolUsage(row.jsonl_path);
     }
     const events = row.jsonl_path && existsSync(row.jsonl_path)
-      ? await readAllEvents(row.jsonl_path)
+      ? await readLastEvents(row.jsonl_path, 50)
       : [];
     return { session: view, events };
   });
@@ -272,12 +272,13 @@ function normalizeLaunchOptions(input: unknown): LaunchOptions | null {
   return Object.keys(out).length ? out : null;
 }
 
-async function readAllEvents(path: string) {
+async function readLastEvents(path: string, n: number) {
   try {
     const content = await readFile(path, 'utf8');
     const lines = content.split('\n').filter(Boolean);
+    const slice = lines.slice(-n);
     const events: unknown[] = [];
-    for (const line of lines) {
+    for (const line of slice) {
       try {
         events.push(JSON.parse(line));
       } catch {

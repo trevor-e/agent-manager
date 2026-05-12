@@ -5,7 +5,8 @@
       "Bash(git commit *)",
       "Bash(git checkout *)",
       "Bash(git stash *)",
-      "Bash(lsof *)"
+      "Bash(lsof *)",
+      "Bash(git push *)"
     ]
   }
 }
