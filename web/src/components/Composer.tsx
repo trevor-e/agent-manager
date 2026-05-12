@@ -21,11 +21,25 @@ export function Composer({
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const attachmentIdCounter = useRef(0);
+  const isNearBottom = useRef(true);
 
   const showCoexistWarning = session.is_running;
 
   useEffect(() => {
-    if (scrollRef.current) {
+    const el = scrollRef.current;
+    if (!el) return;
+    function onScroll() {
+      if (!el) return;
+      const threshold = 150;
+      isNearBottom.current =
+        el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    }
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (isNearBottom.current && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [agent.bubbles, agent.approvals, agent.working]);
@@ -55,6 +69,7 @@ export function Composer({
     setDraft('');
     setAttachments([]);
     setAttachError(null);
+    isNearBottom.current = true;
     await agent.sendPrompt(text, imgs);
   }
 
