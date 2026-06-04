@@ -6,6 +6,7 @@ import { registerLogRoutes } from './routes/log.ts';
 import { registerLinearRoutes } from './routes/linear.ts';
 import { registerKeyRoutes } from './routes/keys.ts';
 import { registerMcpRoutes } from './routes/mcp.ts';
+import { registerWorkflowRoutes } from './routes/workflows.ts';
 
 export function registerRoutes(app: FastifyInstance) {
   registerSessionRoutes(app);
@@ -15,4 +16,5 @@ export function registerRoutes(app: FastifyInstance) {
   registerLinearRoutes(app);
   registerKeyRoutes(app);
   registerMcpRoutes(app);
+  registerWorkflowRoutes(app);
 }

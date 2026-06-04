@@ -7,6 +7,7 @@ import { registerRoutes } from './api/routes.ts';
 import { startScanner, stopScanner } from './scanner/index.ts';
 import { agentManager } from './agent/manager.ts';
 import { killOrphanedAgents } from './agent/cleanup.ts';
+import { seedBuiltinWorkflows } from './workflows/seed.ts';
 import { log, logPathResolved } from './log.ts';
 
 process.on('uncaughtException', err => {
@@ -36,6 +37,8 @@ app.setErrorHandler((err, req, reply) => {
   });
   if (!reply.sent) reply.code(500).send({ error: err.message });
 });
+
+seedBuiltinWorkflows();
 
 registerRoutes(app);
 

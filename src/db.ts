@@ -12,7 +12,7 @@ export const db = new Database(config.dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS schema_meta (
@@ -55,6 +55,17 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_processes_cwd ON running_processes(cwd);
+
+  CREATE TABLE IF NOT EXISTS workflows (
+    id          TEXT PRIMARY KEY,
+    label       TEXT NOT NULL,
+    description TEXT,
+    body        TEXT NOT NULL,
+    builtin     INTEGER NOT NULL DEFAULT 0,
+    version     INTEGER NOT NULL DEFAULT 1,
+    created_at  INTEGER NOT NULL,
+    updated_at  INTEGER NOT NULL
+  );
 `);
 
 function addColumnIfMissing(table: string, column: string, def: string) {
@@ -289,6 +300,61 @@ export function listSessions(opts: { status?: string; repo?: string; q?: string 
   }
   const sql = `SELECT * FROM sessions ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY last_event_at DESC LIMIT 1000`;
   return db.prepare(sql).all(params) as SessionRow[];
+}
+
+export type WorkflowRow = {
+  id: string;
+  label: string;
+  description: string | null;
+  body: string;
+  builtin: number;
+  version: number;
+  created_at: number;
+  updated_at: number;
+};
+
+export function listWorkflows(): WorkflowRow[] {
+  return db
+    .prepare('SELECT * FROM workflows ORDER BY builtin DESC, label ASC')
+    .all() as WorkflowRow[];
+}
+
+export function getWorkflow(id: string): WorkflowRow | undefined {
+  return db.prepare('SELECT * FROM workflows WHERE id = ?').get(id) as WorkflowRow | undefined;
+}
+
+export function upsertWorkflow(row: {
+  id: string;
+  label: string;
+  description?: string | null;
+  body: string;
+  builtin?: boolean;
+  version?: number;
+}) {
+  const now = Date.now();
+  db.prepare(`
+    INSERT INTO workflows (id, label, description, body, builtin, version, created_at, updated_at)
+    VALUES (@id, @label, @description, @body, @builtin, @version, @now, @now)
+    ON CONFLICT(id) DO UPDATE SET
+      label       = excluded.label,
+      description = excluded.description,
+      body        = excluded.body,
+      builtin     = excluded.builtin,
+      version     = excluded.version,
+      updated_at  = excluded.updated_at
+  `).run({
+    id: row.id,
+    label: row.label,
+    description: row.description ?? null,
+    body: row.body,
+    builtin: row.builtin ? 1 : 0,
+    version: row.version ?? 1,
+    now,
+  });
+}
+
+export function deleteWorkflow(id: string) {
+  db.prepare('DELETE FROM workflows WHERE id = ?').run(id);
 }
 
 export function listRunningCwds(): Set<string> {

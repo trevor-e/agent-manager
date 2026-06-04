@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { navigate } from '../App';
-import type { EffortLevel, LaunchOptions, LinearIssue, PermissionMode, RepoSummary } from '../types';
+import type { EffortLevel, LaunchOptions, LinearIssue, PermissionMode, RepoSummary, Workflow } from '../types';
 import { RepoSelect } from './RepoSelect';
 
 const PERMISSION_MODES: { value: PermissionMode; label: string }[] = [
@@ -49,11 +49,24 @@ export function LaunchModal({
   const [systemPrompt, setSystemPrompt] = useState('');
   const [appendSystemPrompt, setAppendSystemPrompt] = useState('');
   const [linearInput, setLinearInput] = useState('');
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [workflowId, setWorkflowId] = useState('');
+  const [workflowArgs, setWorkflowArgs] = useState('');
   const [pending, setPending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  useEffect(() => {
+    api.getWorkflows().then(r => setWorkflows(r.workflows)).catch(() => setWorkflows([]));
+  }, []);
+
+  const selectedWorkflow = workflows.find(w => w.id === workflowId) ?? null;
+
   function buildLaunchOptions(): LaunchOptions {
     const opts: LaunchOptions = { permissionMode };
+    if (workflowId) {
+      opts.workflowId = workflowId;
+      if (workflowArgs.trim()) opts.workflowArgs = workflowArgs.trim();
+    }
     if (worktreeEnabled) {
       opts.worktree = { enabled: true };
       if (worktreeName.trim()) opts.worktree.name = worktreeName.trim();
@@ -117,6 +130,31 @@ export function LaunchModal({
           onChange={e => setTitle(e.target.value)}
           placeholder="e.g. fix flaky test"
         />
+
+        {workflows.length > 0 && (
+          <>
+            <label>Workflow (optional)</label>
+            <select value={workflowId} onChange={e => setWorkflowId(e.target.value)}>
+              <option value="">None — start blank</option>
+              {workflows.map(w => (
+                <option key={w.id} value={w.id}>{w.label}</option>
+              ))}
+            </select>
+            {selectedWorkflow && (
+              <>
+                {selectedWorkflow.description && (
+                  <p className="hint">{selectedWorkflow.description}</p>
+                )}
+                <label>Task for this workflow</label>
+                <textarea
+                  value={workflowArgs}
+                  onChange={e => setWorkflowArgs(e.target.value)}
+                  placeholder="Describe what to investigate / plan / build / review"
+                />
+              </>
+            )}
+          </>
+        )}
 
         {!linearIssue && (
           <>

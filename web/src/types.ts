@@ -27,6 +27,7 @@ export type Session = {
   linear_issue_id: string | null;
   linear_issue_identifier: string | null;
   linear_issue_url: string | null;
+  launch_options: string | null;
   derived_state: import('../../src/shared/types.ts').DerivedState;
   display_name: string;
   is_running: boolean;
@@ -82,4 +83,14 @@ export type LinearProject = {
   id: string;
   name: string;
   issueCount: number;
+};
+
+export type Workflow = {
+  id: string;
+  label: string;
+  description: string | null;
+  body: string;
+  builtin: boolean;
+  version: number;
+  updated_at: number;
 };

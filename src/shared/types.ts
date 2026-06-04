@@ -27,6 +27,11 @@ export type LaunchOptions = {
   appendSystemPrompt?: string;
   forkFrom?: string;
   linearIssueId?: string;
+  // When set, the rendered workflow body is injected as the session's opening
+  // message (web chat) or initial prompt (terminal). workflowArgs fills the
+  // template's $ARGUMENTS placeholder.
+  workflowId?: string;
+  workflowArgs?: string;
 };
 
 export type UsageTotals = {

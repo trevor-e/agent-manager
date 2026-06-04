@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
 import { config } from '../config.ts';
+import { getWorkflow } from '../db.ts';
 import type { LaunchOptions } from '../shared/types.ts';
+import { renderWorkflow } from '../workflows/render.ts';
 import { buildSessionArgs, appendLaunchOptionArgs } from './args.ts';
 
 function shellEscape(s: string): string {
@@ -32,6 +34,14 @@ function buildClaudeArgv(opts: LaunchOpts): string[] {
     }),
   ];
   appendLaunchOptionArgs(args, opts.launchOptions);
+  // For a new session launched with a workflow, seed the first turn by passing
+  // the rendered workflow body as the initial prompt (positional argument).
+  if (opts.kind === 'new' && opts.launchOptions?.workflowId) {
+    const workflow = getWorkflow(opts.launchOptions.workflowId);
+    if (workflow) {
+      args.push(renderWorkflow(workflow.body, opts.launchOptions.workflowArgs));
+    }
+  }
   return args;
 }
 

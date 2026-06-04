@@ -3,10 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { existsSync } from 'node:fs';
 import { config } from '../config.ts';
-import { db, getSession } from '../db.ts';
+import { db, getSession, getWorkflow } from '../db.ts';
 import { log } from '../log.ts';
 import type { LaunchOptions } from '../shared/types.ts';
 import { buildSessionArgs, appendLaunchOptionArgs } from '../launcher/args.ts';
+import { renderWorkflow } from '../workflows/render.ts';
 import type {
   ControlRequestEnvelope,
   ControlResponseEnvelope,
@@ -131,11 +132,26 @@ export class AgentProcess extends EventEmitter {
     });
     log('info', `agent:${this.sessionId}`, 'spawned', { pid: this.child.pid, cwd: this.cwd, isNew });
 
-    void this.sendInitialize();
+    void this.sendInitialize().then(() => this.maybeInjectWorkflow(launchOptions, isNew));
   }
 
   private async sendInitialize() {
     await this.sendControl({ subtype: 'initialize' });
+  }
+
+  // For a brand-new session launched with a workflow, inject the rendered
+  // workflow body as the opening user message. Resumed sessions are never
+  // re-injected (isNew is false once the session has been written to disk).
+  private maybeInjectWorkflow(opts: LaunchOptions | null, isNew: boolean) {
+    if (!isNew || !opts?.workflowId || this.exited) return;
+    const workflow = getWorkflow(opts.workflowId);
+    if (!workflow) {
+      log('warn', `agent:${this.sessionId}`, 'workflow not found', { workflowId: opts.workflowId });
+      return;
+    }
+    const message = renderWorkflow(workflow.body, opts.workflowArgs);
+    log('info', `agent:${this.sessionId}`, 'injecting workflow', { workflowId: opts.workflowId });
+    void this.sendUserMessage(message);
   }
 
   // -------- outgoing -------- //

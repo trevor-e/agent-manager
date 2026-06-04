@@ -269,6 +269,12 @@ function normalizeLaunchOptions(input: unknown): LaunchOptions | null {
   if (typeof src.linearIssueId === 'string' && src.linearIssueId.trim()) {
     out.linearIssueId = src.linearIssueId.trim();
   }
+  if (typeof src.workflowId === 'string' && src.workflowId.trim()) {
+    out.workflowId = src.workflowId.trim();
+  }
+  if (typeof src.workflowArgs === 'string' && src.workflowArgs.trim()) {
+    out.workflowArgs = src.workflowArgs.trim();
+  }
   return Object.keys(out).length ? out : null;
 }
 

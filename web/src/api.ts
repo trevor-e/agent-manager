@@ -1,4 +1,4 @@
-import type { Session, RepoSummary, SessionEvent, GitChanges, LaunchOptions, LinearIssue, LinearProject } from './types';
+import type { Session, RepoSummary, SessionEvent, GitChanges, LaunchOptions, LinearIssue, LinearProject, Workflow } from './types';
 
 async function jget<T>(url: string): Promise<T> {
   const r = await fetch(url);
@@ -66,6 +66,8 @@ export const api = {
   stopAgent: (id: string) => jsend<{ ok: boolean }>(`/api/sessions/${id}/stop`, 'POST'),
   addDir: (id: string, path: string) =>
     jsend<{ ok: boolean; restarted: boolean }>(`/api/sessions/${id}/add-dir`, 'POST', { path }),
+  removeDir: (id: string, path: string) =>
+    jsend<{ ok: boolean; restarted: boolean }>(`/api/sessions/${id}/remove-dir`, 'POST', { path }),
   forkSession: (id: string, opts?: { web_only?: boolean }) =>
     jsend<{ ok: boolean; session_id: string }>(`/api/sessions/${id}/fork`, 'POST', opts),
 
@@ -89,4 +91,6 @@ export const api = {
 
   getKeys: () => jget<{ keys: Record<string, { set: boolean; source: string | null; masked: string | null }> }>('/api/keys'),
   setKeys: (keys: Record<string, string | null>) => jsend<{ ok: boolean }>('/api/keys', 'PUT', keys),
+
+  getWorkflows: () => jget<{ workflows: Workflow[] }>('/api/workflows'),
 };
