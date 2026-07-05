@@ -4,18 +4,31 @@ import { join, basename } from 'node:path';
 import { upsertSession, db } from '../db.ts';
 import { config } from '../config.ts';
 
+// Types skipped outright — no special handling, never allowed to set lastEventType.
+// 'pr-link', 'attachment', and 'queue-operation' are NOT here: they get dedicated
+// handling below (and still `continue`, so they never fall through either).
 const META_TYPES = new Set([
   'permission-mode',
-  'pr-link',
   'system',
   'ai-title',
   'agent-name',
   'custom-title',
   'file-history-snapshot',
+  'mode',
 ]);
 
 const HEAD_BYTES = 64 * 1024;
 const TAIL_BYTES = 32 * 1024;
+
+// attachment.type values that flip plan mode / auto mode on or off. Every other
+// attachment.type (skill_listing, deferred_tools_delta, agent_listing_delta,
+// mcp_instructions_delta, command_permissions, task_reminder, date_change,
+// edited_text_file, queued_command, ...) is pure environment/context bookkeeping
+// with no session-state signal, and is ignored.
+const PLAN_MODE_ON = new Set(['plan_mode', 'plan_mode_reentry']);
+const PLAN_MODE_OFF = new Set(['plan_mode_exit']);
+const AUTO_MODE_ON = new Set(['auto_mode']);
+const AUTO_MODE_OFF = new Set(['auto_mode_exit']);
 
 type JsonlExtract = {
   cwd: string | null;
@@ -30,7 +43,25 @@ type JsonlExtract = {
   prNumber: number | null;
   prRepository: string | null;
   prSeenAtMs: number | null;
+  queuedMessage: string | null;
+  // null means "no plan_mode/auto_mode toggle seen in this scan's head/tail
+  // window" — distinct from false ("we saw a toggle and it was OFF"), so the
+  // caller can carry forward the last known value instead of clobbering it.
+  // These are one-shot events (not re-emitted every turn), so on a long session
+  // the toggle can easily scroll outside the tail window entirely.
+  planMode: boolean | null;
+  planFilePath: string | null;
+  autoMode: boolean | null;
 };
+
+function modeAttachmentSignal(atType: string | undefined): { family: 'plan' | 'auto'; on: boolean } | null {
+  if (!atType) return null;
+  if (PLAN_MODE_ON.has(atType)) return { family: 'plan', on: true };
+  if (PLAN_MODE_OFF.has(atType)) return { family: 'plan', on: false };
+  if (AUTO_MODE_ON.has(atType)) return { family: 'auto', on: true };
+  if (AUTO_MODE_OFF.has(atType)) return { family: 'auto', on: false };
+  return null;
+}
 
 function maybeCapturePrLink(ev: Record<string, unknown>, result: JsonlExtract) {
   if (ev.type !== 'pr-link') return;
@@ -119,6 +150,10 @@ async function extractFromFile(path: string, fileSize: number): Promise<JsonlExt
     prNumber: null,
     prRepository: null,
     prSeenAtMs: null,
+    queuedMessage: null,
+    planMode: null,
+    planFilePath: null,
+    autoMode: null,
   };
 
   const fh = await open(path, 'r');
@@ -145,6 +180,22 @@ async function extractFromFile(path: string, fileSize: number): Promise<JsonlExt
 
       maybeCapturePrLink(ev, result);
 
+      // auto_mode in particular is a one-shot event fired near session start,
+      // so it lives in the head window, not the tail — unlike plan_mode, which
+      // is user-triggered and can happen at any point. Forward iteration means
+      // the last match here is naturally the most recent one within the window;
+      // the tail loop below still wins if it finds a fresher signal itself.
+      if (ev.type === 'attachment') {
+        const at = ev.attachment as Record<string, unknown> | undefined;
+        const sig = modeAttachmentSignal(at && typeof at === 'object' ? (at.type as string | undefined) : undefined);
+        if (sig?.family === 'plan') {
+          result.planMode = sig.on;
+          if (typeof at?.planFilePath === 'string') result.planFilePath = at.planFilePath;
+        } else if (sig?.family === 'auto') {
+          result.autoMode = sig.on;
+        }
+      }
+
       if (!result.firstUserPrompt && ev.type === 'user') {
         const msg = ev.message as Record<string, unknown> | undefined;
         if (msg && typeof msg === 'object') {
@@ -164,6 +215,9 @@ async function extractFromFile(path: string, fileSize: number): Promise<JsonlExt
       tailLines = tailBuf.toString('utf8').split('\n');
     }
 
+    let queueOpSeen = false;
+    let planModeSeen = false;
+    let autoModeSeen = false;
     for (let i = tailLines.length - 1; i >= 0; i--) {
       const o = parseLineSafe(tailLines[i]);
       if (!o || typeof o !== 'object') continue;
@@ -181,6 +235,36 @@ async function extractFromFile(path: string, fileSize: number): Promise<JsonlExt
       }
       if (t === 'pr-link') {
         maybeCapturePrLink(ev, result);
+        continue;
+      }
+      if (t === 'attachment') {
+        // Most of these (skill_listing, deferred_tools_delta, task_reminder, ...)
+        // are environment/context bookkeeping with no session-state signal.
+        // plan_mode and auto_mode transitions are the exception — walking the
+        // tail backwards, the first hit per family is the most recent one.
+        const at = ev.attachment as Record<string, unknown> | undefined;
+        const sig = modeAttachmentSignal(at && typeof at === 'object' ? (at.type as string | undefined) : undefined);
+        if (sig?.family === 'plan' && !planModeSeen) {
+          planModeSeen = true;
+          result.planMode = sig.on;
+          if (typeof at?.planFilePath === 'string') result.planFilePath = at.planFilePath;
+        }
+        if (sig?.family === 'auto' && !autoModeSeen) {
+          autoModeSeen = true;
+          result.autoMode = sig.on;
+        }
+        continue;
+      }
+      if (t === 'queue-operation') {
+        // Most recent queue-operation wins (we're walking the tail backwards).
+        // A trailing 'enqueue' with no later 'dequeue' means the message is
+        // still sitting in the CLI's input queue, unconsumed.
+        if (!queueOpSeen) {
+          queueOpSeen = true;
+          if (ev.operation === 'enqueue' && typeof ev.content === 'string') {
+            result.queuedMessage = ev.content;
+          }
+        }
         continue;
       }
       if (META_TYPES.has(t)) continue;
@@ -207,6 +291,9 @@ async function extractFromFile(path: string, fileSize: number): Promise<JsonlExt
 
   if (result.lastPromptText) {
     result.lastPromptText = result.lastPromptText.replace(/\s+/g, ' ').trim().slice(0, 240);
+  }
+  if (result.queuedMessage) {
+    result.queuedMessage = unwrapLocalCommandOutput(result.queuedMessage).replace(/\s+/g, ' ').trim().slice(0, 240) || null;
   }
   return result;
 }
@@ -305,6 +392,10 @@ export async function scanJsonl(): Promise<{ scanned: number; updated: number }>
         pr_number: extracted.prNumber,
         pr_repository: extracted.prRepository,
         pr_seen_at: extracted.prSeenAtMs,
+        queued_message: extracted.queuedMessage,
+        plan_mode: extracted.planMode === null ? null : (extracted.planMode ? 1 : 0),
+        plan_file_path: extracted.planFilePath,
+        auto_mode: extracted.autoMode === null ? null : (extracted.autoMode ? 1 : 0),
         updated_at: now,
       });
       updated++;

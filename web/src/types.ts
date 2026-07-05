@@ -24,6 +24,10 @@ export type Session = {
   pr_number: number | null;
   pr_repository: string | null;
   pr_seen_at: number | null;
+  queued_message: string | null;
+  plan_mode: number | null;
+  plan_file_path: string | null;
+  auto_mode: number | null;
   linear_issue_id: string | null;
   linear_issue_identifier: string | null;
   linear_issue_url: string | null;

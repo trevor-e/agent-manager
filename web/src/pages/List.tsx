@@ -68,7 +68,8 @@ export function ListPage() {
       list = list.filter(s =>
         s.display_name.toLowerCase().includes(q) ||
         s.repo_name.toLowerCase().includes(q) ||
-        (s.last_prompt ?? '').toLowerCase().includes(q)
+        (s.last_prompt ?? '').toLowerCase().includes(q) ||
+        (s.queued_message ?? '').toLowerCase().includes(q)
       );
     }
     return [...list].sort((a, b) => {
@@ -169,6 +170,21 @@ export function ListPage() {
                 >
                   PR #{s.pr_number}
                 </a>
+              )}
+              {s.queued_message && (
+                <span className="queued-pill" title={s.queued_message}>
+                  📥 queued
+                </span>
+              )}
+              {!!s.plan_mode && (
+                <span className="plan-mode-pill" title={s.plan_file_path ?? 'Plan mode'}>
+                  📝 planning
+                </span>
+              )}
+              {!!s.auto_mode && (
+                <span className="auto-mode-pill" title="Auto mode is active for this session">
+                  🤖 auto
+                </span>
               )}
               {s.git_branch && <span className="muted small">{s.git_branch}</span>}
               {s.usage && s.usage.totalTokens > 0 && (

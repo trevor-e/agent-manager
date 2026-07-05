@@ -269,6 +269,24 @@ export function DetailPage({ id }: { id: string }) {
             )}
             <span>•</span>
             <span>last activity <span className="age-value">{ageStr(now, session.last_event_at)}</span> ago</span>
+            {session.queued_message && (
+              <>
+                <span>•</span>
+                <span className="queued-pill" title={session.queued_message}>📥 queued</span>
+              </>
+            )}
+            {!!session.plan_mode && (
+              <>
+                <span>•</span>
+                <span className="plan-mode-pill" title={session.plan_file_path ?? 'Plan mode'}>📝 planning</span>
+              </>
+            )}
+            {!!session.auto_mode && (
+              <>
+                <span>•</span>
+                <span className="auto-mode-pill" title="Auto mode is active for this session">🤖 auto</span>
+              </>
+            )}
             {session.usage && session.usage.totalTokens > 0 && (
               <>
                 <span>•</span>

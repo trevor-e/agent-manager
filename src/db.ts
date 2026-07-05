@@ -85,6 +85,14 @@ addColumnIfMissing('sessions', 'parent_session_id', 'TEXT');
 addColumnIfMissing('sessions', 'linear_issue_id', 'TEXT');
 addColumnIfMissing('sessions', 'linear_issue_identifier', 'TEXT');
 addColumnIfMissing('sessions', 'linear_issue_url', 'TEXT');
+addColumnIfMissing('sessions', 'queued_message', 'TEXT');
+// Nullable, not defaulted to 0: plan_mode/auto_mode toggles are one-shot events
+// that can scroll outside the scanner's tail window on long sessions, so NULL
+// ("no fresh signal this scan") must stay distinguishable from 0 ("known off")
+// to let the upsert COALESCE onto the last known value instead of clobbering it.
+addColumnIfMissing('sessions', 'plan_mode', 'INTEGER');
+addColumnIfMissing('sessions', 'plan_file_path', 'TEXT');
+addColumnIfMissing('sessions', 'auto_mode', 'INTEGER');
 
 const prevVersion = (db.prepare("SELECT value FROM schema_meta WHERE key = 'schema_version'").get() as
   | { value: string }
@@ -143,6 +151,10 @@ export type SessionRow = {
   pr_number: number | null;
   pr_repository: string | null;
   pr_seen_at: number | null;
+  queued_message: string | null;
+  plan_mode: number | null;
+  plan_file_path: string | null;
+  auto_mode: number | null;
   launch_options: string | null;
   linear_issue_id: string | null;
   linear_issue_identifier: string | null;
@@ -164,13 +176,15 @@ const upsertSessionStmt = db.prepare(`
     id, host, project_path, repo_name, jsonl_path, git_branch,
     auto_title, first_seen_at, last_event_at, last_event_type,
     last_prompt, file_mtime, file_size,
-    pr_url, pr_number, pr_repository, pr_seen_at,
+    pr_url, pr_number, pr_repository, pr_seen_at, queued_message,
+    plan_mode, plan_file_path, auto_mode,
     updated_at
   ) VALUES (
     @id, @host, @project_path, @repo_name, @jsonl_path, @git_branch,
     @auto_title, @first_seen_at, @last_event_at, @last_event_type,
     @last_prompt, @file_mtime, @file_size,
-    @pr_url, @pr_number, @pr_repository, @pr_seen_at,
+    @pr_url, @pr_number, @pr_repository, @pr_seen_at, @queued_message,
+    @plan_mode, @plan_file_path, @auto_mode,
     @updated_at
   )
   ON CONFLICT(id) DO UPDATE SET
@@ -184,6 +198,10 @@ const upsertSessionStmt = db.prepare(`
     last_prompt     = excluded.last_prompt,
     file_mtime      = excluded.file_mtime,
     file_size       = excluded.file_size,
+    queued_message  = excluded.queued_message,
+    plan_mode       = COALESCE(excluded.plan_mode, sessions.plan_mode),
+    plan_file_path  = COALESCE(excluded.plan_file_path, sessions.plan_file_path),
+    auto_mode       = COALESCE(excluded.auto_mode, sessions.auto_mode),
     pr_url          = CASE WHEN excluded.pr_seen_at IS NOT NULL
                             AND (sessions.pr_seen_at IS NULL OR excluded.pr_seen_at >= sessions.pr_seen_at)
                            THEN excluded.pr_url ELSE sessions.pr_url END,
