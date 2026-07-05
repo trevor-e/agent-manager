@@ -8,6 +8,7 @@ import {
   type AssistantBubble,
   eventsToBubbles,
 } from '../components/Bubble';
+import type { QueuedBubble } from '../components/bubble/types';
 import type { Approval, ResolveOpts } from '../components/composer/approvals';
 import type { Attachment } from '../components/composer/attachments';
 
@@ -28,6 +29,9 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
   const [working, setWorking] = useState(
     session.derived_state === 'working' || session.derived_state === 'launching'
   );
+
+  const [queuedMessages, setQueuedMessages] = useState<QueuedBubble[]>([]);
+  const queueRef = useRef<QueuedBubble[]>([]);
 
   const bubbleIdCounter = useRef(0);
   const esRef = useRef<EventSource | null>(null);
@@ -131,8 +135,20 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
         const p = ev.parsed;
         if (!p || typeof p !== 'object') return;
         if (p.type === 'result') {
-          setWorking(false);
           streamingMessageIdRef.current = null;
+          const next = queueRef.current[0];
+          if (next) {
+            queueRef.current = queueRef.current.slice(1);
+            setQueuedMessages([...queueRef.current]);
+            setBubbles(prev => [...prev, {
+              kind: 'user' as const,
+              id: next.id,
+              text: next.text,
+              ...(next.images?.length ? { images: next.images } : {}),
+            }]);
+          } else {
+            setWorking(false);
+          }
           return;
         }
         if (p.type === 'stream_event' && p.event && typeof p.event === 'object') {
@@ -208,6 +224,8 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
         setConnected(false);
         setWorking(false);
         streamingMessageIdRef.current = null;
+        queueRef.current = [];
+        setQueuedMessages([]);
         notify(`Session finished`, session.display_name ?? 'Session');
         break;
       case 'error':
@@ -215,6 +233,8 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
         setConnected(false);
         setWorking(false);
         streamingMessageIdRef.current = null;
+        queueRef.current = [];
+        setQueuedMessages([]);
         notify(`Agent error`, ev.message);
         break;
     }
@@ -262,19 +282,42 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
   async function sendPrompt(text: string, imgs: Attachment[] = []) {
     if (pending) return;
     if (!text.trim() && imgs.length === 0) return;
+    const images = imgs.length ? imgs.map(a => ({ dataUrl: a.dataUrl })) : undefined;
+
+    const hasActiveUserTurn = working && bubbles.some(b => b.kind === 'user');
+    let queuedId: string | undefined;
+
+    if (hasActiveUserTurn) {
+      queuedId = nextLiveId();
+      const queued: QueuedBubble = {
+        kind: 'queued',
+        id: queuedId,
+        text,
+        ...(images ? { images } : {}),
+      };
+      queueRef.current = [...queueRef.current, queued];
+      setQueuedMessages([...queueRef.current]);
+    } else {
+      addBubble({
+        kind: 'user',
+        text,
+        ...(images ? { images } : {}),
+      } as Bubble);
+      setWorking(true);
+    }
+
     setPending(true);
-    setWorking(true);
-    addBubble({
-      kind: 'user',
-      text,
-      ...(imgs.length ? { images: imgs.map(a => ({ dataUrl: a.dataUrl })) } : {}),
-    } as Bubble);
     try {
       const apiImages = imgs.map(a => ({ mediaType: a.mediaType, data: a.base64 }));
       await api.sendMessage(session.id, text, apiImages);
     } catch (e) {
       addBubble({ kind: 'system', text: `error: ${(e as Error).message}` } as Bubble);
-      setWorking(false);
+      if (hasActiveUserTurn && queuedId) {
+        queueRef.current = queueRef.current.filter(q => q.id !== queuedId);
+        setQueuedMessages([...queueRef.current]);
+      } else {
+        setWorking(false);
+      }
     } finally {
       setPending(false);
     }
@@ -329,6 +372,7 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
   return {
     connected,
     bubbles,
+    queuedMessages,
     approvals,
     working,
     pending,

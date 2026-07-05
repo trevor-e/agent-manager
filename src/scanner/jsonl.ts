@@ -72,6 +72,19 @@ function extractText(content: unknown): string | null {
   return null;
 }
 
+function stripAnsi(s: string): string {
+  // eslint-disable-next-line no-control-regex
+  return s.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+}
+
+function unwrapLocalCommandOutput(s: string): string {
+  return stripAnsi(
+    s
+      .replace(/<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/g, '$1')
+      .replace(/<local-command-stderr>([\s\S]*?)<\/local-command-stderr>/g, '$1'),
+  );
+}
+
 function cleanPrompt(raw: string | null): string | null {
   if (!raw) return null;
   let s = raw.trim();
@@ -86,6 +99,7 @@ function cleanPrompt(raw: string | null): string | null {
   }
   s = s.replace(/<command-message>[\s\S]*?<\/command-message>/g, '');
   s = s.replace(/<command-args>[\s\S]*?<\/command-args>/g, '');
+  s = unwrapLocalCommandOutput(s);
   s = s.replace(/\s+/g, ' ').trim();
   if (!s) return null;
   return s.length > 200 ? s.slice(0, 200) : s;
@@ -182,7 +196,7 @@ async function extractFromFile(path: string, fileSize: number): Promise<JsonlExt
           const msg = ev.message as Record<string, unknown> | undefined;
           if (msg && typeof msg === 'object') {
             const text = extractText(msg.content);
-            if (text) result.lastPromptText = text;
+            if (text) result.lastPromptText = unwrapLocalCommandOutput(text);
           }
         }
       }

@@ -130,6 +130,11 @@ function parseEventTs(ts: unknown): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
+function stripAnsi(s: string): string {
+  // eslint-disable-next-line no-control-regex
+  return s.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+}
+
 function cleanUserPrompt(raw: string): string {
   if (!raw) return '';
   let s = raw.trim();
@@ -139,6 +144,9 @@ function cleanUserPrompt(raw: string): string {
   }
   s = s.replace(/<command-message>[\s\S]*?<\/command-message>/g, '');
   s = s.replace(/<command-args>[\s\S]*?<\/command-args>/g, '');
+  s = s.replace(/<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/g, '$1');
+  s = s.replace(/<local-command-stderr>([\s\S]*?)<\/local-command-stderr>/g, '$1');
+  s = stripAnsi(s);
   const cmd = s.match(/^<command-name>([^<]+)<\/command-name>/);
   if (cmd) s = `(${cmd[1].trim()})`;
   return s.replace(/\s+/g, ' ').trim();

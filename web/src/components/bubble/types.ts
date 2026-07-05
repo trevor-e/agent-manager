@@ -15,4 +15,6 @@ export type ToolUseBubble = {
 };
 export type SystemBubble = { kind: 'system'; id: string; text: string };
 
+export type QueuedBubble = { kind: 'queued'; id: string; text: string; images?: UserImage[] };
+
 export type Bubble = AssistantBubble | UserBubble | ToolUseBubble | SystemBubble;

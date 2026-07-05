@@ -4,6 +4,7 @@ export type {
   UserBubble,
   ToolUseBubble,
   SystemBubble,
+  QueuedBubble,
   Bubble,
 } from './bubble/types';
 export { eventsToBubbles } from './bubble/eventsToBubbles';

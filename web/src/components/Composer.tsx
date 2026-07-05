@@ -43,7 +43,7 @@ export function Composer({
     if (isNearBottom.current && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [agent.bubbles, agent.approvals, agent.working]);
+  }, [agent.bubbles, agent.approvals, agent.working, agent.queuedMessages]);
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -72,7 +72,7 @@ export function Composer({
     setAttachments([]);
     setAttachError(null);
     isNearBottom.current = true;
-    await agent.sendPrompt(text, imgs);
+    agent.sendPrompt(text, imgs);
   }
 
   async function addFiles(files: File[]) {
@@ -145,6 +145,27 @@ export function Composer({
         )}
         {agent.bubbles.map(b => <BubbleRow key={b.id} bubble={b} />)}
         {agent.working && shouldShowThinking(agent.bubbles) && <ThinkingBubble />}
+        {agent.queuedMessages.length > 0 && (
+          <>
+            <div className="queued-divider">
+              <span>Queued — will be sent when the current turn finishes</span>
+            </div>
+            {agent.queuedMessages.map(q => (
+              <div key={q.id} className="bubble-row bubble-row-user bubble-row-queued">
+                <div className="bubble bubble-user bubble-queued">
+                  {q.images?.length ? (
+                    <div className="bubble-user-images">
+                      {q.images.map((img, i) => (
+                        <img key={i} src={img.dataUrl} alt="" className="bubble-user-image" />
+                      ))}
+                    </div>
+                  ) : null}
+                  {q.text && <div className="bubble-user-text">{q.text}</div>}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
       </div>
 
       <QuickActions
@@ -216,7 +237,7 @@ export function Composer({
             disabled={agent.pending || (!draft.trim() && attachments.length === 0)}
             onClick={send}
           >
-            {agent.pending ? 'sending…' : 'Send'}
+            {agent.pending ? 'sending…' : agent.working ? 'Queue' : 'Send'}
           </button>
         </div>
       </div>

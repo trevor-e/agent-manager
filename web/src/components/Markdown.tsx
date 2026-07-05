@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import { all, common } from 'lowlight';
 
 const components = {
   a: (props: any) => (
@@ -13,7 +14,9 @@ export function Markdown({ children }: { children: string }) {
     <div className="md">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
+        rehypePlugins={[
+          [rehypeHighlight, { detect: true, languages: all, subset: Object.keys(common) }],
+        ]}
         components={components}
       >
         {children}

@@ -13,6 +13,13 @@ const PERMISSION_MODES: { value: PermissionMode; label: string }[] = [
   { value: 'dontAsk', label: "Don't ask" },
 ];
 
+const MODELS: { value: string; label: string }[] = [
+  { value: 'claude-sonnet-5', label: 'Sonnet 5' },
+  { value: 'claude-opus-4-8', label: 'Opus 4.8' },
+  { value: 'claude-fable-5', label: 'Fable 5' },
+  { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
+];
+
 const EFFORTS: { value: EffortLevel | ''; label: string }[] = [
   { value: '', label: 'Default' },
   { value: 'low', label: 'Low' },
@@ -43,7 +50,7 @@ export function LaunchModal({
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('auto');
   const [worktreeEnabled, setWorktreeEnabled] = useState(false);
   const [worktreeName, setWorktreeName] = useState('');
-  const [model, setModel] = useState('claude-opus-4-6');
+  const [model, setModel] = useState('claude-sonnet-5');
   const [effort, setEffort] = useState<EffortLevel | ''>('');
   const [addDirsText, setAddDirsText] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
@@ -60,6 +67,10 @@ export function LaunchModal({
   }, []);
 
   const selectedWorkflow = workflows.find(w => w.id === workflowId) ?? null;
+  const workflowCards: { id: string; label: string; description: string | null }[] = [
+    { id: '', label: 'Standard', description: 'Blank session, no preset instructions' },
+    ...workflows,
+  ];
 
   function buildLaunchOptions(): LaunchOptions {
     const opts: LaunchOptions = { permissionMode };
@@ -131,30 +142,58 @@ export function LaunchModal({
           placeholder="e.g. fix flaky test"
         />
 
-        {workflows.length > 0 && (
+        <label className="modal-section-label">Workflow</label>
+        <div className="workflow-cards">
+          {workflowCards.map(w => (
+            <button
+              key={w.id || 'standard'}
+              type="button"
+              className={`workflow-card${workflowId === w.id ? ' workflow-card-selected' : ''}`}
+              onClick={() => setWorkflowId(w.id)}
+            >
+              <span className="workflow-card-title">{w.label}</span>
+              {w.description && <span className="workflow-card-desc">{w.description}</span>}
+            </button>
+          ))}
+        </div>
+        {selectedWorkflow && (
           <>
-            <label>Workflow (optional)</label>
-            <select value={workflowId} onChange={e => setWorkflowId(e.target.value)}>
-              <option value="">None — start blank</option>
-              {workflows.map(w => (
-                <option key={w.id} value={w.id}>{w.label}</option>
-              ))}
-            </select>
-            {selectedWorkflow && (
-              <>
-                {selectedWorkflow.description && (
-                  <p className="hint">{selectedWorkflow.description}</p>
-                )}
-                <label>Task for this workflow</label>
-                <textarea
-                  value={workflowArgs}
-                  onChange={e => setWorkflowArgs(e.target.value)}
-                  placeholder="Describe what to investigate / plan / build / review"
-                />
-              </>
-            )}
+            <label>Task for this workflow</label>
+            <textarea
+              value={workflowArgs}
+              onChange={e => setWorkflowArgs(e.target.value)}
+              placeholder="Describe what to investigate / plan / build / review"
+              autoFocus
+            />
           </>
         )}
+
+        <div className="row">
+          <div>
+            <label>Model</label>
+            <select value={model} onChange={e => setModel(e.target.value)}>
+              {MODELS.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label>Effort</label>
+            <select value={effort} onChange={e => setEffort(e.target.value as EffortLevel | '')}>
+              {EFFORTS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label>Permission mode</label>
+            <select value={permissionMode} onChange={e => setPermissionMode(e.target.value as PermissionMode)}>
+              {PERMISSION_MODES.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         {!linearIssue && (
           <>
@@ -166,13 +205,6 @@ export function LaunchModal({
             />
           </>
         )}
-
-        <label>Permission mode</label>
-        <select value={permissionMode} onChange={e => setPermissionMode(e.target.value as PermissionMode)}>
-          {PERMISSION_MODES.map(m => (
-            <option key={m.value} value={m.value}>{m.label}</option>
-          ))}
-        </select>
 
         <label className="checkbox-row">
           <input
@@ -192,24 +224,6 @@ export function LaunchModal({
 
         <details>
           <summary>More options</summary>
-          <div className="row">
-            <div>
-              <label>Model</label>
-              <input
-                value={model}
-                onChange={e => setModel(e.target.value)}
-                placeholder="sonnet, opus, haiku, or full id"
-              />
-            </div>
-            <div>
-              <label>Effort</label>
-              <select value={effort} onChange={e => setEffort(e.target.value as EffortLevel | '')}>
-                {EFFORTS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
           <label>System prompt (replaces default)</label>
           <textarea
             value={systemPrompt}
