@@ -123,6 +123,7 @@ export function LaunchModal({
     <div className="modal-bg" onClick={onClose}>
       <form className="modal" onClick={e => e.stopPropagation()} onSubmit={submit}>
         <h3>Launch new session</h3>
+        <div className="modal-body">
         {linearIssue && (
           <a className="linear-issue-link" href={linearIssue.url} target="_blank" rel="noreferrer">
             {linearIssue.identifier}: {linearIssue.title}
@@ -149,13 +150,21 @@ export function LaunchModal({
               key={w.id || 'standard'}
               type="button"
               className={`workflow-card${workflowId === w.id ? ' workflow-card-selected' : ''}`}
-              onClick={() => setWorkflowId(w.id)}
+              onClick={() => {
+                setWorkflowId(w.id);
+                if (w.id === 'plan') setPermissionMode('plan');
+              }}
             >
               <span className="workflow-card-title">{w.label}</span>
               {w.description && <span className="workflow-card-desc">{w.description}</span>}
             </button>
           ))}
         </div>
+        {workflowId === 'plan' && permissionMode === 'plan' && (
+          <p className="hint">
+            Permission mode set to Plan mode (read-only) — you'll get a prompt to accept the plan and switch modes before claude starts editing.
+          </p>
+        )}
         {selectedWorkflow && (
           <>
             <label>Task for this workflow</label>
@@ -222,26 +231,37 @@ export function LaunchModal({
           />
         )}
 
-        <details>
+        <details className="modal-more">
           <summary>More options</summary>
-          <label>System prompt (replaces default)</label>
-          <textarea
-            value={systemPrompt}
-            onChange={e => setSystemPrompt(e.target.value)}
-            placeholder="Custom system prompt — replaces the default entirely"
-          />
-          <label>Append to system prompt</label>
-          <textarea
-            value={appendSystemPrompt}
-            onChange={e => setAppendSystemPrompt(e.target.value)}
-            placeholder="Added after the default system prompt"
-          />
-          <label>Additional allowed directories</label>
-          <textarea
-            value={addDirsText}
-            onChange={e => setAddDirsText(e.target.value)}
-            placeholder="One path per line, or comma-separated"
-          />
+          <div className="modal-more-body">
+            <div className="modal-field">
+              <label>System prompt (replaces default)</label>
+              <textarea
+                className="compact"
+                value={systemPrompt}
+                onChange={e => setSystemPrompt(e.target.value)}
+                placeholder="Custom system prompt — replaces the default entirely"
+              />
+            </div>
+            <div className="modal-field">
+              <label>Append to system prompt</label>
+              <textarea
+                className="compact"
+                value={appendSystemPrompt}
+                onChange={e => setAppendSystemPrompt(e.target.value)}
+                placeholder="Added after the default system prompt"
+              />
+            </div>
+            <div className="modal-field">
+              <label>Additional allowed directories</label>
+              <textarea
+                className="compact"
+                value={addDirsText}
+                onChange={e => setAddDirsText(e.target.value)}
+                placeholder="One path per line, or comma-separated"
+              />
+            </div>
+          </div>
         </details>
 
         <label className="checkbox-row">
@@ -252,12 +272,15 @@ export function LaunchModal({
           />
           <span>Open in Ghostty terminal instead of web chat</span>
         </label>
-        {err && <div className="error">{err}</div>}
-        <div className="modal-actions">
-          <button type="button" className="ghost" onClick={onClose}>Cancel</button>
-          <button type="submit" className="primary" disabled={pending}>
-            {pending ? 'Launching…' : openInTerminal ? 'Launch in Ghostty' : 'Launch web chat'}
-          </button>
+        </div>
+        <div className="modal-footer">
+          {err && <div className="error">{err}</div>}
+          <div className="modal-actions">
+            <button type="button" className="ghost" onClick={onClose}>Cancel</button>
+            <button type="submit" className="primary" disabled={pending}>
+              {pending ? 'Launching…' : openInTerminal ? 'Launch in Ghostty' : 'Launch web chat'}
+            </button>
+          </div>
         </div>
       </form>
     </div>

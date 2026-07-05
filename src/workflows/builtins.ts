@@ -15,7 +15,7 @@
 // overwrites the stored copy. User-authored (non-builtin) workflows are never
 // touched by the seeder.
 
-export const BUILTIN_WORKFLOW_VERSION = 1;
+export const BUILTIN_WORKFLOW_VERSION = 2;
 
 export type BuiltinWorkflow = {
   id: string;
@@ -25,40 +25,6 @@ export type BuiltinWorkflow = {
 };
 
 const SHARED_DECOMPOSITION = `When you break work into items, give each one: a goal, a "done when" check, the key files, dependencies on other items, and a rough size. Keep items independently verifiable.`;
-
-const INVESTIGATE = `You are investigating the following, in this codebase:
-
-$ARGUMENTS
-
-You orchestrate and delegate the heavy reading. Stay lean; push wide reads and
-external lookups into sub-agents. Do not stop until the evidence chain is solid.
-
-PHASE 1 — Triage (cheap)
-- Spend 1-2 quick tool calls locating the relevant area. Do NOT deep-read yet.
-- Open a findings file at docs/investigations/<topic>-<YYYY-MM-DD>.md and record
-  the question, your initial hypotheses, and what would confirm or kill each one.
-
-PHASE 2 — Fan out read-only probes (parallel)
-- Use the Task tool to spawn read-only sub-agents for anything that would flood
-  your own context: git archaeology (blame / log / diff on the suspect code),
-  wide grep sweeps for a symbol or pattern, reading large files, and any
-  external/web lookups for library behavior or error strings.
-- Each probe returns a tight summary with file:line evidence — not raw dumps.
-
-PHASE 3 — Deep investigation
-- Spawn one Task sub-agent as lead investigator for the main line of inquiry. It
-  reads the implementation, runs git, follows the call graph, and writes its
-  line-referenced findings into the report file.
-
-PHASE 4 — Synthesize
-- Reason over the gathered evidence yourself. Resolve or discard each hypothesis.
-- Finish the report with: root cause, the evidence chain (file:line for each
-  link), and concrete recommendations. State your confidence and any gaps.
-
-Anti-patterns:
-- Reading the whole repo yourself instead of delegating probes.
-- Concluding before the evidence chain is complete.
-- Dumping raw tool output into the report instead of summarizing with citations.`;
 
 const PLAN = `Produce an implementation plan for the following. Do NOT implement anything —
 this workflow ends at a written plan.
@@ -89,38 +55,6 @@ PHASE 4 — Critique and polish
 Anti-patterns:
 - Sliding into implementation. Stop at the plan.
 - A plan with no "done when" criteria or no ordering.`;
-
-const BUILD = `Research, then implement, the following:
-
-$ARGUMENTS
-
-PHASE 1 — Quick scan
-- Understand how the task relates to the codebase with a few targeted tool calls.
-  Don't boil the ocean.
-
-PHASE 2 — Gather context
-- If the relevant code is non-trivial to find, spawn a read-only explore Task
-  sub-agent to report the files and symbols you'll need to touch, with file:line
-  references. Use its report to focus.
-
-PHASE 3 — Confirm the approach
-- Form a concrete plan: the files to change and the shape of each change.
-  ${SHARED_DECOMPOSITION}
-- If a real gap remains (an unresolved design decision), resolve it now —
-  reason it through, or ask the user. Don't proceed on a guess.
-
-PHASE 4 — Implement
-- Make the changes directly with the editing tools. Keep changes targeted and
-  minimal — no unrequested refactors. Follow the surrounding code's conventions.
-
-PHASE 5 — Verify
-- Run the relevant build/tests/linters for the area you changed. Report what you
-  ran and the result. Fix what you broke, then summarize the change.
-
-Anti-patterns:
-- Implementing before the approach is clear.
-- Unrequested refactors or scope creep.
-- Claiming done without actually running the checks.`;
 
 const REVIEW = `Review code changes for the following scope:
 
@@ -156,22 +90,10 @@ Anti-patterns:
 
 export const BUILTIN_WORKFLOWS: BuiltinWorkflow[] = [
   {
-    id: 'investigate',
-    label: 'Investigate',
-    description: 'Evidence-gathering research: triage, delegate probes, synthesize a root-cause report.',
-    body: INVESTIGATE,
-  },
-  {
     id: 'plan',
     label: 'Plan',
     description: 'Produce a written implementation plan (no code) ending at docs/plans/.',
     body: PLAN,
-  },
-  {
-    id: 'build',
-    label: 'Build',
-    description: 'Research then implement a change directly, then verify.',
-    body: BUILD,
   },
   {
     id: 'review',

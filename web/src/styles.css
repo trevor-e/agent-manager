@@ -148,10 +148,16 @@ button.green .kbd-hint { border-color: rgba(63,185,80,0.3); color: var(--green);
 }
 .modal {
   background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
-  padding: 20px; width: 680px; max-width: 92vw;
+  padding: 20px; width: 680px; max-width: 92vw; max-height: 88vh;
   display: flex; flex-direction: column; gap: 8px;
 }
-.modal h3 { margin: 0 0 4px 0; }
+.modal h3 { margin: 0 0 4px 0; flex-shrink: 0; }
+.modal-body {
+  display: flex; flex-direction: column; gap: 8px;
+  overflow-y: auto; min-height: 0;
+  padding-right: 4px; margin-right: -4px;
+}
+.modal-footer { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
 .modal input,
 .modal select,
 .modal textarea {
@@ -174,13 +180,33 @@ button.green .kbd-hint { border-color: rgba(63,185,80,0.3); color: var(--green);
 .modal textarea:focus { outline: none; border-color: var(--accent); }
 .modal label { font-size: 12px; color: var(--fg2); }
 .modal-section-label { font-size: 13px; color: var(--fg); font-weight: 600; margin-top: 4px; }
+.modal .hint { font-size: 12px; color: var(--fg2); margin: -2px 0 0 0; }
 .modal .row { display: flex; gap: 8px; }
 .modal .row > * { flex: 1; min-width: 0; }
 .modal .row select,
 .modal .row input { width: 100%; }
-.modal details { border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; }
-.modal details summary { cursor: pointer; font-size: 12px; color: var(--fg2); padding: 4px 0; }
-.modal details[open] { padding-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+.modal-more {
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg3);
+}
+.modal-more summary {
+  cursor: pointer; font-size: 12px; font-weight: 600; color: var(--fg2);
+  padding: 9px 12px; list-style: none;
+  display: flex; align-items: center; gap: 6px; user-select: none;
+}
+.modal-more summary::-webkit-details-marker { display: none; }
+.modal-more summary::after {
+  content: ''; width: 10px; height: 10px; margin-left: auto;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: center; background-size: contain;
+  transition: transform .15s;
+}
+.modal-more:hover summary { color: var(--fg); }
+.modal-more[open] summary { border-bottom: 1px solid var(--border); }
+.modal-more[open] summary::after { transform: rotate(180deg); }
+.modal-more-body { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.modal-field { display: flex; flex-direction: column; gap: 4px; }
+.modal-field label { margin: 0; }
+.modal textarea.compact { min-height: 40px; font-size: 13px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
 
 .workflow-cards {
