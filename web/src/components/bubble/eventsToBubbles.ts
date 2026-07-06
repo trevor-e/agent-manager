@@ -29,6 +29,14 @@ export function eventsToBubbles(events: any[]): Bubble[] {
     if (t === 'user' && msg && typeof msg === 'object') {
       const content = msg.content;
       if (typeof content === 'string') {
+        const notif = parseTaskNotification(content);
+        if (notif) {
+          // Already visible by expanding the originating tool_use's subagent transcript.
+          if (!(notif.toolUseId && toolByUseId.has(notif.toolUseId))) {
+            bubbles.push({ kind: 'system', id: nextId(), text: formatTaskNotification(notif) });
+          }
+          continue;
+        }
         const cleaned = cleanUserPrompt(content);
         if (cleaned) bubbles.push({ kind: 'user', id: nextId(), text: cleaned });
       } else if (Array.isArray(content)) {
@@ -150,6 +158,24 @@ function cleanUserPrompt(raw: string): string {
   const cmd = s.match(/^<command-name>([^<]+)<\/command-name>/);
   if (cmd) s = `(${cmd[1].trim()})`;
   return s.replace(/\s+/g, ' ').trim();
+}
+
+type TaskNotification = { toolUseId: string | null; status: string | null; summary: string | null };
+
+function parseTaskNotification(raw: string): TaskNotification | null {
+  const s = raw.trim();
+  if (!s.startsWith('<task-notification>') || !s.endsWith('</task-notification>')) return null;
+  const field = (tag: string) => s.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`))?.[1]?.trim() ?? null;
+  return {
+    toolUseId: field('tool-use-id'),
+    status: field('status'),
+    summary: field('summary'),
+  };
+}
+
+function formatTaskNotification(notif: TaskNotification): string {
+  if (notif.summary) return notif.summary;
+  return notif.status ? `Background task ${notif.status}.` : 'Background task finished.';
 }
 
 function extractToolResultText(content: any): string {
