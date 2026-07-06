@@ -156,6 +156,7 @@ export function Composer({
           <BubbleRow
             key={b.id}
             bubble={b}
+            onSendFeedback={agent.sendPrompt}
             sessionId={session.id}
             subagentsByToolUseId={subagentsByToolUseId}
           />

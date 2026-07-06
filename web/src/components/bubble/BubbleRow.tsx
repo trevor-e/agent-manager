@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { useNow } from '../../useNow';
 import { detectDanger } from '../../dangerDetect';
 import { api } from '../../api';
@@ -43,7 +43,7 @@ function summarizeInput(toolName: string, input: any): string {
   return json.length > 200 ? json.slice(0, 200) + '…' : json;
 }
 
-export function BubbleRow({
+export const BubbleRow = memo(function BubbleRow({
   bubble,
   sessionId,
   subagentsByToolUseId,
@@ -91,7 +91,7 @@ export function BubbleRow({
       <div className="bubble bubble-system muted small">{bubble.text}</div>
     </div>
   );
-}
+});
 
 const PREVIEW_LINES = 4;
 

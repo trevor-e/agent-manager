@@ -1,4 +1,5 @@
-import ReactMarkdown from 'react-markdown';
+import { memo } from 'react';
+import ReactMarkdown, { type Options } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import { all, common } from 'lowlight';
@@ -9,18 +10,17 @@ const components = {
   ),
 };
 
-export function Markdown({ children }: { children: string }) {
+const REMARK_PLUGINS: Options['remarkPlugins'] = [remarkGfm];
+const REHYPE_PLUGINS: Options['rehypePlugins'] = [
+  [rehypeHighlight, { detect: true, languages: all, subset: Object.keys(common) }],
+];
+
+export const Markdown = memo(function Markdown({ children }: { children: string }) {
   return (
     <div className="md">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[
-          [rehypeHighlight, { detect: true, languages: all, subset: Object.keys(common) }],
-        ]}
-        components={components}
-      >
+      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS} components={components}>
         {children}
       </ReactMarkdown>
     </div>
   );
-}
+});

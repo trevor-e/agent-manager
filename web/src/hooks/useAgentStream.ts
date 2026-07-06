@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { notify } from '../notifications';
 import type { Session, SessionEvent } from '../types';
@@ -284,7 +284,7 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
     }
   }
 
-  async function sendPrompt(text: string, imgs: Attachment[] = []) {
+  const sendPrompt = useCallback(async (text: string, imgs: Attachment[] = []) => {
     if (pending) return;
     if (!text.trim() && imgs.length === 0) return;
     const images = imgs.length ? imgs.map(a => ({ dataUrl: a.dataUrl })) : undefined;
@@ -326,7 +326,8 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
     } finally {
       setPending(false);
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id, pending, working, bubbles]);
 
   async function resolveApproval(
     approvalId: string,
