@@ -1,6 +1,13 @@
 import { useMemo } from 'react';
 import { structuredPatch } from 'diff';
 import hljs from 'highlight.js';
+import { Markdown } from './Markdown';
+
+const MARKDOWN_EXT = /\.(md|mdx|markdown)$/i;
+
+function isMarkdownPath(filePath?: string): boolean {
+  return !!filePath && MARKDOWN_EXT.test(filePath);
+}
 
 type Props = {
   oldText: string;
@@ -34,6 +41,7 @@ function langFromPath(filePath?: string): string | undefined {
 }
 
 function addHighlighting(lines: Line[], filePath?: string): Line[] {
+  if (isMarkdownPath(filePath)) return lines;
   const lang = langFromPath(filePath);
   if (!lang || !hljs.getLanguage(lang)) return lines;
   return lines.map((l) => {
@@ -66,26 +74,32 @@ function buildLines(oldText: string, newText: string, context: number): Line[] {
   return lines;
 }
 
-function DiffBody({ lines }: { lines: Line[] }) {
+function DiffBody({ lines, markdown }: { lines: Line[]; markdown?: boolean }) {
+  const Wrapper = markdown ? 'div' : 'pre';
   return (
-    <pre className="diff-body mono">
+    <Wrapper className="diff-body mono">
       {lines.map((l, i) => (
         <div key={i} className={`diff-line diff-line-${l.kind}`}>
           <span className="diff-marker">
             {l.kind === 'add' ? '+' : l.kind === 'del' ? '-' : l.kind === 'hunk' ? '' : ' '}
           </span>
-          {l.html ? (
+          {markdown && l.kind !== 'hunk' ? (
+            <div className="diff-text diff-text-md">
+              {l.text.trim() ? <Markdown>{l.text}</Markdown> : ' '}
+            </div>
+          ) : l.html ? (
             <span className="diff-text" dangerouslySetInnerHTML={{ __html: l.html }} />
           ) : (
             <span className="diff-text">{l.text}</span>
           )}
         </div>
       ))}
-    </pre>
+    </Wrapper>
   );
 }
 
 export function UnifiedDiff({ oldText, newText, filePath, context = 3 }: Props) {
+  const markdown = isMarkdownPath(filePath);
   const lines = useMemo(
     () => addHighlighting(buildLines(oldText ?? '', newText ?? '', context), filePath),
     [oldText, newText, context, filePath],
@@ -98,12 +112,13 @@ export function UnifiedDiff({ oldText, newText, filePath, context = 3 }: Props) 
   return (
     <div className="diff">
       {filePath && <div className="diff-header mono">{filePath}</div>}
-      <DiffBody lines={lines} />
+      <DiffBody lines={lines} markdown={markdown} />
     </div>
   );
 }
 
 export function RawUnifiedDiff({ diff, filePath }: { diff: string; filePath?: string }) {
+  const markdown = isMarkdownPath(filePath);
   const lines = useMemo(
     () => addHighlighting(parseUnifiedDiff(diff ?? ''), filePath),
     [diff, filePath],
@@ -116,7 +131,7 @@ export function RawUnifiedDiff({ diff, filePath }: { diff: string; filePath?: st
   return (
     <div className="diff">
       {filePath && <div className="diff-header mono">{filePath}</div>}
-      <DiffBody lines={lines} />
+      <DiffBody lines={lines} markdown={markdown} />
     </div>
   );
 }
@@ -141,6 +156,7 @@ function parseUnifiedDiff(text: string): Line[] {
 }
 
 export function AdditionsView({ content, filePath }: { content: string; filePath?: string }) {
+  const markdown = isMarkdownPath(filePath);
   const lines = useMemo(() => {
     const raw: Line[] = (content ?? '').split('\n').map((text) => ({ kind: 'add' as const, text }));
     return addHighlighting(raw, filePath);
@@ -149,7 +165,7 @@ export function AdditionsView({ content, filePath }: { content: string; filePath
   return (
     <div className="diff">
       {filePath && <div className="diff-header mono">{filePath}</div>}
-      <DiffBody lines={lines} />
+      <DiffBody lines={lines} markdown={markdown} />
     </div>
   );
 }

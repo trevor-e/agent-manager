@@ -781,29 +781,8 @@ button .kbd-hint { background: transparent; border-color: rgba(88,166,255,0.25);
 }
 .diff-line-ctx { color: var(--fg2); }
 
-.diff-mode-row { display: flex; justify-content: flex-end; margin-bottom: 6px; }
-.diff-mode-tabs { display: flex; gap: 4px; }
-.diff-mode-tabs .tab {
-  background: var(--bg3); color: var(--fg2);
-  border: 1px solid var(--border); border-radius: 6px;
-  padding: 3px 9px; font-size: 11px; cursor: pointer;
-}
-.diff-mode-tabs .tab:hover { color: var(--fg); border-color: var(--gray); }
-.diff-mode-tabs .tab-on {
-  background: var(--accent-bg); color: var(--accent);
-  border-color: rgba(88,166,255,0.4);
-}
-.md-preview-pair {
-  display: flex; flex-direction: column; gap: 10px;
-  padding: 10px; max-height: 480px; overflow: auto;
-}
-.md-preview-block { background: var(--bg2); border-radius: 6px; padding: 8px 10px; }
-.md-preview-label {
-  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
-}
-.md-preview-full {
-  padding: 10px; max-height: 480px; overflow: auto;
-}
+.diff-text-md { flex: 1; min-width: 0; }
+.diff-text-md .md { font-size: 12px; line-height: 1.45; }
 
 /* ---- Git view ---- */
 .git-view {
