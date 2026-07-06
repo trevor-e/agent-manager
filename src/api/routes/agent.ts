@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { getSession, getLaunchOptions, setLaunchOptions } from '../../db.ts';
+import { getSession, getLaunchOptions, setLaunchOptions, setUserStatus } from '../../db.ts';
 import type { PermissionMode } from '../../shared/types.ts';
 import type { UserContentBlock } from '../../agent/types.ts';
 import { agentManager } from '../../agent/manager.ts';
@@ -88,6 +88,7 @@ export function registerAgentRoutes(app: FastifyInstance) {
         reply.code(409);
         return { error: 'no live agent; open the session in the dashboard first' };
       }
+      if (session.user_status !== 'active') setUserStatus(session.id, 'active');
       if (images.length === 0) {
         await proc.sendUserMessage(text);
       } else {

@@ -1,7 +1,7 @@
 import { readdir, stat, open } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
-import { upsertSession, db } from '../db.ts';
+import { upsertSession, setUserStatus, db } from '../db.ts';
 import { config } from '../config.ts';
 
 // Types skipped outright — no special handling, never allowed to set lastEventType.
@@ -299,7 +299,7 @@ async function extractFromFile(path: string, fileSize: number): Promise<JsonlExt
 }
 
 const getFileMetaStmt = db.prepare(
-  'SELECT file_mtime, file_size, auto_title, jsonl_path, pr_seen_at FROM sessions WHERE id = ?'
+  'SELECT file_mtime, file_size, auto_title, jsonl_path, pr_seen_at, user_status FROM sessions WHERE id = ?'
 );
 
 export async function scanJsonl(): Promise<{ scanned: number; updated: number }> {
@@ -348,6 +348,7 @@ export async function scanJsonl(): Promise<{ scanned: number; updated: number }>
             auto_title: string | null;
             jsonl_path: string | null;
             pr_seen_at: number | null;
+            user_status: 'active' | 'done' | 'archived';
           }
         | undefined;
 
@@ -398,6 +399,9 @@ export async function scanJsonl(): Promise<{ scanned: number; updated: number }>
         auto_mode: extracted.autoMode === null ? null : (extracted.autoMode ? 1 : 0),
         updated_at: now,
       });
+      if (existing && (existing.user_status === 'done' || existing.user_status === 'archived')) {
+        setUserStatus(sessionId, 'active');
+      }
       updated++;
     }
   }
