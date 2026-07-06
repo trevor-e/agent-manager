@@ -10,7 +10,7 @@ import { SessionSidebar, sortSidebarSessions } from '../components/SessionSideba
 import { computeSlots, rememberSlotNav } from '../sessionSlots';
 import type { RepoSummary, Session, SessionEvent } from '../types';
 import { useNow } from '../useNow';
-import { formatCost, formatTokens, usageTooltip } from '../format';
+import { contextPercent, formatCost, formatTokens, usageTooltip } from '../format';
 import { STATE_LABELS, ageStr } from '../constants';
 
 function isInputFocused(): boolean {
@@ -186,6 +186,7 @@ export function DetailPage({ id }: { id: string }) {
   if (err) return <div className="error pad">{err}</div>;
   if (!data || !session) return <div className="muted pad">loading…</div>;
   const { events } = data;
+  const ctxPct = session.usage ? contextPercent(session.usage) : null;
 
   return (
     <div className="detail">
@@ -294,6 +295,17 @@ export function DetailPage({ id }: { id: string }) {
               <span className="usage-stat" title={usageTooltip(session.usage)}>
                 {formatCost(session.usage.costUSD)}
                 <span className="usage-tokens"> ({formatTokens(session.usage.totalTokens)} tok)</span>
+              </span>
+            </>
+          )}
+          {ctxPct != null && (
+            <>
+              <span>•</span>
+              <span
+                className={'context-pill' + (ctxPct >= 90 ? ' context-pill-critical' : ctxPct >= 70 ? ' context-pill-warning' : '')}
+                title={usageTooltip(session.usage!)}
+              >
+                {ctxPct}% context
               </span>
             </>
           )}

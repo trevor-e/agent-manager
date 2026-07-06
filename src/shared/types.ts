@@ -41,4 +41,8 @@ export type UsageTotals = {
   cacheCreationTokens: number;
   totalTokens: number;
   costUSD: number;
+  // Context window usage as of the most recent turn (not cumulative — unlike
+  // the totals above, context size doesn't accumulate additively across turns).
+  contextTokens?: number;
+  contextWindow?: number;
 };

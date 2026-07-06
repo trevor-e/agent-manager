@@ -22,6 +22,8 @@ type RawEntry = {
   cache_creation_input_token_cost?: number;
   cache_creation_input_token_cost_above_1hr?: number;
   litellm_provider?: string;
+  max_input_tokens?: number;
+  max_tokens?: number;
 };
 type RawJson = Record<string, RawEntry>;
 
@@ -97,4 +99,11 @@ export async function getModelPricing(model: string): Promise<ModelPricing | nul
       entry.cache_creation_input_token_cost ??
       0,
   };
+}
+
+export async function getModelContextWindow(model: string): Promise<number | null> {
+  const json = await ensureLoaded();
+  const entry = lookupKey(json, model);
+  const max = entry?.max_input_tokens ?? entry?.max_tokens;
+  return typeof max === 'number' && max > 0 ? max : null;
 }

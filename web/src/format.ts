@@ -15,13 +15,25 @@ export function formatCost(usd: number): string {
   return `$${usd.toFixed(0)}`;
 }
 
+export function contextPercent(u: UsageTotals): number | null {
+  if (!u.contextTokens || !u.contextWindow) return null;
+  return Math.round((u.contextTokens / u.contextWindow) * 100);
+}
+
 export function usageTooltip(u: UsageTotals): string {
-  return [
+  const lines = [
     `input: ${u.inputTokens.toLocaleString()}`,
     `output: ${u.outputTokens.toLocaleString()}`,
     `cache read: ${u.cacheReadTokens.toLocaleString()}`,
     `cache write: ${u.cacheCreationTokens.toLocaleString()}`,
     `total: ${u.totalTokens.toLocaleString()}`,
     `est. cost: $${u.costUSD.toFixed(4)}`,
-  ].join('\n');
+  ];
+  const pct = contextPercent(u);
+  if (pct != null) {
+    lines.push(
+      `context: ${u.contextTokens!.toLocaleString()} / ${u.contextWindow!.toLocaleString()} (${pct}%)`,
+    );
+  }
+  return lines.join('\n');
 }

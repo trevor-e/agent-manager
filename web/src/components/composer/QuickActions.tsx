@@ -20,8 +20,8 @@ export function QuickActions({
       <button
         className="quick-action"
         disabled={pending}
-        onClick={() => onSendPrompt('commit and push the changes')}
-        title="Send: commit and push the changes"
+        onClick={() => onSendPrompt("commit and push only the changes made in this session — the working tree may have unrelated changes from other parallel sessions, so check the diff carefully and don't include anything you didn't touch in this conversation")}
+        title="Send: commit and push only the changes from this session"
       >
         Commit &amp; push
       </button>

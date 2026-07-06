@@ -1,5 +1,5 @@
 import { stat, readFile } from 'node:fs/promises';
-import { getModelPricing } from './pricing.ts';
+import { getModelPricing, getModelContextWindow } from './pricing.ts';
 import type { UsageTotals } from '../shared/types.ts';
 
 export type { UsageTotals } from '../shared/types.ts';
@@ -30,6 +30,10 @@ export async function computeUsage(path: string): Promise<UsageTotals | null> {
   // by message.id, keeping the last usage block (which has the final totals).
   const byId = new Map<string, { model: string; usage: Record<string, unknown> }>();
   const anonymous: Array<{ model: string; usage: Record<string, unknown> }> = [];
+  // Tracks the most recently seen assistant usage block (in file/chronological
+  // order) — that's the current context size, as opposed to the cumulative
+  // totals below which sum every turn.
+  let last: { model: string; usage: Record<string, unknown> } | null = null;
 
   for (const line of content.split('\n')) {
     if (!line) continue;
@@ -51,6 +55,7 @@ export async function computeUsage(path: string): Promise<UsageTotals | null> {
     } else {
       anonymous.push({ model, usage });
     }
+    last = { model, usage };
   }
 
   const totals: UsageTotals = {
@@ -104,6 +109,15 @@ export async function computeUsage(path: string): Promise<UsageTotals | null> {
   }
   totals.totalTokens =
     totals.inputTokens + totals.outputTokens + totals.cacheReadTokens + totals.cacheCreationTokens;
+
+  if (last) {
+    totals.contextTokens =
+      numField(last.usage, 'input_tokens') +
+      numField(last.usage, 'cache_read_input_tokens') +
+      numField(last.usage, 'cache_creation_input_tokens');
+    const window = await getModelContextWindow(last.model);
+    if (window) totals.contextWindow = window;
+  }
 
   cache.set(path, { mtimeMs: st.mtimeMs, size: st.size, totals });
   return totals;
