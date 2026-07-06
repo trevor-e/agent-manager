@@ -30,7 +30,7 @@ const PLAN_MODE_OFF = new Set(['plan_mode_exit']);
 const AUTO_MODE_ON = new Set(['auto_mode']);
 const AUTO_MODE_OFF = new Set(['auto_mode_exit']);
 
-type JsonlExtract = {
+export type JsonlExtract = {
   cwd: string | null;
   gitBranch: string | null;
   aiTitle: string | null;
@@ -144,7 +144,7 @@ function cleanPrompt(raw: string | null): string | null {
   return s.length > 200 ? s.slice(0, 200) : s;
 }
 
-async function extractFromFile(path: string, fileSize: number): Promise<JsonlExtract> {
+export async function extractFromFile(path: string, fileSize: number): Promise<JsonlExtract> {
   const result: JsonlExtract = {
     cwd: null,
     gitBranch: null,
