@@ -219,8 +219,12 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
       case 'stderr':
         if (ev.line) addBubble({ kind: 'system', text: `[stderr] ${ev.line}` } as Bubble);
         break;
-      case 'exit':
-        addBubble({ kind: 'system', text: `agent exited (code=${ev.code ?? '?'})` } as Bubble);
+      case 'exit': {
+        const text =
+          ev.signal === 'SIGTERM' || ev.code === 143
+            ? 'agent stopped (idle timeout)'
+            : `agent exited (code=${ev.code ?? '?'})`;
+        addBubble({ kind: 'system', text } as Bubble);
         setConnected(false);
         setWorking(false);
         streamingMessageIdRef.current = null;
@@ -228,6 +232,7 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
         setQueuedMessages([]);
         notify(`Session finished`, session.display_name ?? 'Session');
         break;
+      }
       case 'error':
         addBubble({ kind: 'system', text: `agent error: ${ev.message}` } as Bubble);
         setConnected(false);
