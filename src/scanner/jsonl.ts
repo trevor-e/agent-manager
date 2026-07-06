@@ -116,9 +116,17 @@ function unwrapLocalCommandOutput(s: string): string {
   );
 }
 
+function taskNotificationSummary(raw: string): string | null {
+  const s = raw.trim();
+  if (!s.startsWith('<task-notification>') || !s.endsWith('</task-notification>')) return null;
+  return s.match(/<summary>([\s\S]*?)<\/summary>/)?.[1]?.trim() || 'Background task finished.';
+}
+
 function cleanPrompt(raw: string | null): string | null {
   if (!raw) return null;
   let s = raw.trim();
+  const notif = taskNotificationSummary(s);
+  if (notif) return notif.length > 200 ? notif.slice(0, 200) : notif;
   if (s.startsWith('<local-command-caveat>')) {
     const close = s.indexOf('</local-command-caveat>');
     if (close >= 0) s = s.slice(close + '</local-command-caveat>'.length).trim();
@@ -280,7 +288,7 @@ async function extractFromFile(path: string, fileSize: number): Promise<JsonlExt
           const msg = ev.message as Record<string, unknown> | undefined;
           if (msg && typeof msg === 'object') {
             const text = extractText(msg.content);
-            if (text) result.lastPromptText = unwrapLocalCommandOutput(text);
+            if (text) result.lastPromptText = taskNotificationSummary(text) ?? unwrapLocalCommandOutput(text);
           }
         }
       }
