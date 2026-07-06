@@ -225,9 +225,7 @@ export function DetailPage({ id }: { id: string }) {
               {session.display_name}
             </h1>
           )}
-        </div>
-        <div className="meta-row muted small">
-          <span className="mono">{session.project_path}</span>
+          <span className="mono muted small title-row-path">{session.project_path}</span>
           <span className="add-dir-wrapper">
             <button
               className="add-dir-btn"
@@ -263,13 +261,14 @@ export function DetailPage({ id }: { id: string }) {
               </div>
             )}
           </span>
+        </div>
+        <div className="meta-row muted small">
           {session.git_branch && (
             <>
-              <span>•</span>
               <span>{session.git_branch}</span>
+              <span>•</span>
             </>
           )}
-          <span>•</span>
           <span>last activity <span className="age-value">{ageStr(now, session.last_event_at)}</span> ago</span>
           {session.queued_message && (
             <>

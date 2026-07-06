@@ -307,7 +307,8 @@ button.green .kbd-hint { border-color: rgba(63,185,80,0.3); color: var(--green);
 
 .detail { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; }
 .detail-header { display: flex; flex-direction: column; }
-.title-row { display: flex; align-items: center; gap: 10px; }
+.title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.title-row-path { word-break: break-all; }
 .state-pill { font-size: 12px; padding: 2px 10px; border-radius: 999px; background: var(--bg2); color: var(--fg2); display: inline-block; flex: none; }
 .title { font-size: 22px; margin: 0; cursor: pointer; }
 .title:hover { color: var(--accent); }
