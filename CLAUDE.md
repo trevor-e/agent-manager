@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pnpm build:web` — build SPA into `dist/`. The server serves `dist/` statically when present and falls back to a hint page if missing.
 - `pnpm start` — run the server without watch.
 - `pnpm bulk-done` — run `scripts/bulk-done.ts` (one-off DB maintenance script).
-- `pnpm test` — run the Vitest suite (`vitest run`, config at `vitest.config.ts`). Covers both `src/**/*.test.ts` (server) and `web/src/**/*.test.ts` (frontend) — pure-function/parsing logic mainly (e.g. `src/scanner/jsonl.test.ts`, `web/src/components/bubble/eventsToBubbles.test.ts`). Pinned to vitest 3.x because vitest 4 requires Vite 6+, and the app build is pinned to Vite 5.
+- `pnpm test` — run the Vitest suite (`vitest run`, config at `vitest.config.ts`). Covers both `src/**/*.test.ts` (server) and `web/src/**/*.test.ts` (frontend) — pure-function/parsing logic mainly (e.g. `src/scanner/jsonl.test.ts`, `web/src/components/bubble/eventsToBubbles.test.ts`).
 
 There is no linter or typecheck script wired into npm scripts. `tsconfig.json` uses `noEmit: true` with `allowImportingTsExtensions` — all TS imports inside the repo use explicit `.ts`/`.tsx` extensions, run via `tsx`. Don't strip the extensions.
 
