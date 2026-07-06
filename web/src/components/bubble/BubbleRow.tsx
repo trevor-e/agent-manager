@@ -4,6 +4,7 @@ import { detectDanger } from '../../dangerDetect';
 import { api } from '../../api';
 import type { SubagentSummary } from '../../types';
 import { Markdown } from '../Markdown';
+import { AnnotatableMarkdown } from '../annotate/AnnotatableMarkdown';
 import { UnifiedDiff, AdditionsView } from '../UnifiedDiff';
 import { eventsToBubbles } from './eventsToBubbles';
 import type { Bubble, ToolUseBubble } from './types';
@@ -45,10 +46,12 @@ function summarizeInput(toolName: string, input: any): string {
 
 export const BubbleRow = memo(function BubbleRow({
   bubble,
+  onSendFeedback,
   sessionId,
   subagentsByToolUseId,
 }: {
   bubble: Bubble;
+  onSendFeedback?: (text: string) => void;
   sessionId?: string;
   subagentsByToolUseId?: Map<string, SubagentSummary>;
 }) {
@@ -72,7 +75,15 @@ export const BubbleRow = memo(function BubbleRow({
     return (
       <div className="bubble-row bubble-row-assistant">
         <div className="bubble bubble-assistant">
-          {bubble.text ? <Markdown>{bubble.text}</Markdown> : <span className="muted">…</span>}
+          {bubble.text ? (
+            onSendFeedback ? (
+              <AnnotatableMarkdown text={bubble.text} onSend={onSendFeedback} />
+            ) : (
+              <Markdown>{bubble.text}</Markdown>
+            )
+          ) : (
+            <span className="muted">…</span>
+          )}
         </div>
       </div>
     );

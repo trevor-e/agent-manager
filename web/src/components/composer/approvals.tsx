@@ -2,7 +2,7 @@ import { useMemo, useState, type KeyboardEvent } from 'react';
 import { detectDanger } from '../../dangerDetect';
 import type { PermissionMode } from '../../types';
 import { ToolInputView } from '../Bubble';
-import { Markdown } from '../Markdown';
+import { AnnotatableMarkdown } from '../annotate/AnnotatableMarkdown';
 
 const enterOnly = (e: KeyboardEvent) => { if (e.key !== 'Enter') e.preventDefault(); };
 
@@ -74,7 +74,11 @@ function ExitPlanModeModal({
           claude finished planning. Pick a mode to drop into when you accept.
         </p>
         <div className="plan-body">
-          {plan ? <Markdown>{plan}</Markdown> : <em className="muted">(empty plan)</em>}
+          {plan ? (
+            <AnnotatableMarkdown text={plan} onSend={(reason) => onResolve('deny', { reason })} />
+          ) : (
+            <em className="muted">(empty plan)</em>
+          )}
         </div>
         <div className="modal-actions plan-actions">
           <button className="ghost" onKeyDown={enterOnly} onClick={() => onResolve('deny', { reason: 'keep planning' })}>
