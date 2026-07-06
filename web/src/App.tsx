@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { api } from './api';
 import { KeysModal } from './components/KeysModal';
 import { McpStatus } from './components/McpStatus';
@@ -6,6 +6,12 @@ import { requestNotificationPermission } from './notifications';
 import { ListPage } from './pages/List';
 import { DetailPage } from './pages/Detail';
 import { LinearPage } from './pages/Linear';
+
+const HeaderActionsContext = createContext<HTMLDivElement | null>(null);
+
+export function useHeaderActionsSlot() {
+  return useContext(HeaderActionsContext);
+}
 
 function getRoute(): { name: 'list' } | { name: 'detail'; id: string } | { name: 'linear' } {
   const path = window.location.pathname.replace(/\/+$/, '');
@@ -24,6 +30,7 @@ export function App() {
   const [route, setRoute] = useState(getRoute);
   const [linearConfigured, setLinearConfigured] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
+  const [actionsEl, setActionsEl] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
     const onChange = () => setRoute(getRoute());
     window.addEventListener('popstate', onChange);
@@ -70,9 +77,12 @@ export function App() {
         <button className="ghost topbar-link" onClick={() => setKeysOpen(true)}>Keys</button>
         <McpStatus />
         <div className="grow" />
+        <div className="actions topbar-actions" ref={setActionsEl} />
       </header>
       <main>
-        {route.name === 'list' ? <ListPage /> : route.name === 'linear' ? <LinearPage /> : <DetailPage id={route.id} />}
+        <HeaderActionsContext.Provider value={actionsEl}>
+          {route.name === 'list' ? <ListPage /> : route.name === 'linear' ? <LinearPage /> : <DetailPage id={route.id} />}
+        </HeaderActionsContext.Provider>
       </main>
       {keysOpen && (
         <KeysModal

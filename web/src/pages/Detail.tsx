@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../api';
-import { navigate } from '../App';
+import { navigate, useHeaderActionsSlot } from '../App';
 import { Composer } from '../components/Composer';
 import { GitView } from '../components/GitView';
 import { LaunchModal } from '../components/LaunchModal';
@@ -34,6 +35,7 @@ export function DetailPage({ id }: { id: string }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const now = useNow();
+  const headerActionsSlot = useHeaderActionsSlot();
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -188,8 +190,8 @@ export function DetailPage({ id }: { id: string }) {
   return (
     <div className="detail">
       <div className="detail-header">
-        <div>
-          <div className="state-pill">{STATE_LABELS[session.derived_state] ?? session.derived_state}</div>
+        <div className="title-row">
+          <span className="state-pill">{STATE_LABELS[session.derived_state] ?? session.derived_state}</span>
           {editing ? (
             <input
               autoFocus
@@ -222,109 +224,112 @@ export function DetailPage({ id }: { id: string }) {
               {session.display_name}
             </h1>
           )}
-          <div className="meta-row muted small">
-            <span className="mono">{session.id}</span>
-            <span>•</span>
-            <span className="mono">{session.project_path}</span>
-            <span className="add-dir-wrapper">
-              <button
-                className="add-dir-btn"
-                title="Add another directory to this session"
-                onClick={() => { setAddDirOpen(v => !v); setAddDirValue(''); }}
+        </div>
+        <div className="meta-row muted small">
+          <span className="mono">{session.project_path}</span>
+          <span className="add-dir-wrapper">
+            <button
+              className="add-dir-btn"
+              title="Add another directory to this session"
+              onClick={() => { setAddDirOpen(v => !v); setAddDirValue(''); }}
+            >
+              {addDirOpen ? '×' : '+'}
+            </button>
+            {addDirOpen && (
+              <div
+                className="add-dir-popover"
+                onKeyDown={e => { if (e.key === 'Escape') { setAddDirOpen(false); setAddDirValue(''); } }}
               >
-                {addDirOpen ? '×' : '+'}
-              </button>
-              {addDirOpen && (
-                <div
-                  className="add-dir-popover"
-                  onKeyDown={e => { if (e.key === 'Escape') { setAddDirOpen(false); setAddDirValue(''); } }}
+                <RepoSelect
+                  repos={repos.filter(r => r.project_path !== session.project_path)}
+                  value={addDirValue}
+                  onChange={setAddDirValue}
+                  autoFocus
+                  placeholder="pick or type a directory path"
+                />
+                <button
+                  className="primary"
+                  disabled={!addDirValue.trim()}
+                  onClick={async () => {
+                    const path = addDirValue.trim();
+                    setAddDirOpen(false);
+                    setAddDirValue('');
+                    await api.addDir(session.id, path);
+                  }}
                 >
-                  <RepoSelect
-                    repos={repos.filter(r => r.project_path !== session.project_path)}
-                    value={addDirValue}
-                    onChange={setAddDirValue}
-                    autoFocus
-                    placeholder="pick or type a directory path"
-                  />
-                  <button
-                    className="primary"
-                    disabled={!addDirValue.trim()}
-                    onClick={async () => {
-                      const path = addDirValue.trim();
-                      setAddDirOpen(false);
-                      setAddDirValue('');
-                      await api.addDir(session.id, path);
-                    }}
-                  >
-                    Add
-                  </button>
-                </div>
-              )}
-            </span>
-            {session.git_branch && (
-              <>
-                <span>•</span>
-                <span>{session.git_branch}</span>
-              </>
+                  Add
+                </button>
+              </div>
             )}
-            <span>•</span>
-            <span>last activity <span className="age-value">{ageStr(now, session.last_event_at)}</span> ago</span>
-            {session.queued_message && (
-              <>
-                <span>•</span>
-                <span className="queued-pill" title={session.queued_message}>📥 queued</span>
-              </>
-            )}
-            {!!session.plan_mode && (
-              <>
-                <span>•</span>
-                <span className="plan-mode-pill" title={session.plan_file_path ?? 'Plan mode'}>📝 planning</span>
-              </>
-            )}
-            {!!session.auto_mode && (
-              <>
-                <span>•</span>
-                <span className="auto-mode-pill" title="Auto mode is active for this session">🤖 auto</span>
-              </>
-            )}
-            {session.usage && session.usage.totalTokens > 0 && (
-              <>
-                <span>•</span>
-                <span className="usage-stat" title={usageTooltip(session.usage)}>
-                  {formatCost(session.usage.costUSD)}
-                  <span className="usage-tokens"> ({formatTokens(session.usage.totalTokens)} tok)</span>
-                </span>
-              </>
-            )}
-            {session.tool_usage && Object.keys(session.tool_usage).length > 0 && (
-              <>
-                <span>•</span>
-                {Object.entries(session.tool_usage)
-                  .sort(([, a], [, b]) => b - a)
-                  .slice(0, 10)
-                  .map(([name, count]) => (
-                    <span key={name} className="usage-pill">{name}: {count}</span>
-                  ))}
-              </>
-            )}
-          </div>
-          {(session.linear_issue_identifier || session.pr_url) && (
-            <div className="pr-row" style={{ display: 'flex', gap: '8px' }}>
-              {session.linear_issue_identifier && session.linear_issue_url && (
-                <a className="linear-issue-link linear-issue-link-large" href={session.linear_issue_url} target="_blank" rel="noreferrer">
-                  {session.linear_issue_identifier}
-                </a>
-              )}
-              {session.pr_url && (
-                <a className="pr-link pr-link-large" href={session.pr_url} target="_blank" rel="noreferrer">
-                  {session.pr_repository ?? 'PR'} #{session.pr_number}
-                </a>
-              )}
-            </div>
+          </span>
+          {session.git_branch && (
+            <>
+              <span>•</span>
+              <span>{session.git_branch}</span>
+            </>
+          )}
+          <span>•</span>
+          <span>last activity <span className="age-value">{ageStr(now, session.last_event_at)}</span> ago</span>
+          {session.queued_message && (
+            <>
+              <span>•</span>
+              <span className="queued-pill" title={session.queued_message}>📥 queued</span>
+            </>
+          )}
+          {!!session.plan_mode && (
+            <>
+              <span>•</span>
+              <span className="plan-mode-pill" title={session.plan_file_path ?? 'Plan mode'}>📝 planning</span>
+            </>
+          )}
+          {!!session.auto_mode && (
+            <>
+              <span>•</span>
+              <span className="auto-mode-pill" title="Auto mode is active for this session">🤖 auto</span>
+            </>
+          )}
+          {session.usage && session.usage.totalTokens > 0 && (
+            <>
+              <span>•</span>
+              <span className="usage-stat" title={usageTooltip(session.usage)}>
+                {formatCost(session.usage.costUSD)}
+                <span className="usage-tokens"> ({formatTokens(session.usage.totalTokens)} tok)</span>
+              </span>
+            </>
+          )}
+          {session.tool_usage && Object.keys(session.tool_usage).length > 0 && (
+            <>
+              <span>•</span>
+              {Object.entries(session.tool_usage)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 10)
+                .map(([name, count]) => (
+                  <span key={name} className="usage-pill">{name}: {count}</span>
+                ))}
+            </>
           )}
         </div>
-        <div className="grow" />
-        <div className="actions">
+        {(session.linear_issue_identifier || session.pr_url) && (
+          <div className="pr-row" style={{ display: 'flex', gap: '8px' }}>
+            {session.linear_issue_identifier && session.linear_issue_url && (
+              <a className="linear-issue-link linear-issue-link-large" href={session.linear_issue_url} target="_blank" rel="noreferrer">
+                {session.linear_issue_identifier}
+              </a>
+            )}
+            {session.pr_url && (
+              <a className="pr-link pr-link-large" href={session.pr_url} target="_blank" rel="noreferrer">
+                {session.pr_repository ?? 'PR'} #{session.pr_number}
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+
+      {headerActionsSlot && createPortal(
+        <>
+          <button className="primary" onClick={() => setLaunchOpen(true)} title="New session">
+            + New session <kbd className="kbd-hint">⌘E</kbd>
+          </button>
           <button
             onClick={() => setView(v => (v === 'conversation' ? 'diff' : 'conversation'))}
             title="Toggle conversation / diff view"
@@ -332,7 +337,6 @@ export function DetailPage({ id }: { id: string }) {
             {view === 'conversation' ? 'View changes' : 'View chat'}
             <kbd className="kbd-hint">⌘B</kbd>
           </button>
-          <button onClick={fork} title="Fork this session into a new one">Fork<kbd className="kbd-hint">⇧⌘F</kbd></button>
           <button onClick={markDone} title="Toggle done">
             {session.user_status === 'done' ? 'Mark active' : 'Mark done'}
             <kbd className="kbd-hint">⌘.</kbd>
@@ -341,15 +345,14 @@ export function DetailPage({ id }: { id: string }) {
             <button onClick={() => setMoreOpen(v => !v)} title="More actions">···</button>
             {moreOpen && (
               <div className="action-more-menu">
+                <button onClick={() => { fork(); setMoreOpen(false); }}>Fork</button>
                 <button onClick={() => { resume(); setMoreOpen(false); }}>Resume in Ghostty</button>
               </div>
             )}
           </div>
-          <button className="primary" onClick={() => setLaunchOpen(true)} title="New session">
-            + New session <kbd className="kbd-hint">⌘E</kbd>
-          </button>
-        </div>
-      </div>
+        </>,
+        headerActionsSlot,
+      )}
 
       <div className="detail-body">
         {view === 'conversation' ? (
