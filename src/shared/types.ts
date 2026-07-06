@@ -34,6 +34,13 @@ export type LaunchOptions = {
   workflowArgs?: string;
 };
 
+export type SubagentSummary = {
+  agentId: string;
+  toolUseId: string | null;
+  agentType: string | null;
+  description: string | null;
+};
+
 export type UsageTotals = {
   inputTokens: number;
   outputTokens: number;

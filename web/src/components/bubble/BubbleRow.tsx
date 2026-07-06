@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useNow } from '../../useNow';
 import { detectDanger } from '../../dangerDetect';
+import { api } from '../../api';
+import type { SubagentSummary } from '../../types';
 import { Markdown } from '../Markdown';
 import { UnifiedDiff, AdditionsView } from '../UnifiedDiff';
+import { eventsToBubbles } from './eventsToBubbles';
 import type { Bubble, ToolUseBubble } from './types';
 
 function formatElapsed(ms: number): string {
@@ -40,7 +43,15 @@ function summarizeInput(toolName: string, input: any): string {
   return json.length > 200 ? json.slice(0, 200) + '…' : json;
 }
 
-export function BubbleRow({ bubble }: { bubble: Bubble }) {
+export function BubbleRow({
+  bubble,
+  sessionId,
+  subagentsByToolUseId,
+}: {
+  bubble: Bubble;
+  sessionId?: string;
+  subagentsByToolUseId?: Map<string, SubagentSummary>;
+}) {
   if (bubble.kind === 'user') {
     return (
       <div className="bubble-row bubble-row-user">
@@ -66,7 +77,15 @@ export function BubbleRow({ bubble }: { bubble: Bubble }) {
       </div>
     );
   }
-  if (bubble.kind === 'tool_use') return <ToolBubbleRow bubble={bubble} />;
+  if (bubble.kind === 'tool_use') {
+    return (
+      <ToolBubbleRow
+        bubble={bubble}
+        sessionId={sessionId}
+        subagent={subagentsByToolUseId?.get(bubble.toolUseId)}
+      />
+    );
+  }
   return (
     <div className="bubble-row bubble-row-system">
       <div className="bubble bubble-system muted small">{bubble.text}</div>
@@ -76,7 +95,15 @@ export function BubbleRow({ bubble }: { bubble: Bubble }) {
 
 const PREVIEW_LINES = 4;
 
-function ToolBubbleRow({ bubble }: { bubble: ToolUseBubble }) {
+function ToolBubbleRow({
+  bubble,
+  sessionId,
+  subagent,
+}: {
+  bubble: ToolUseBubble;
+  sessionId?: string;
+  subagent?: SubagentSummary;
+}) {
   const [expanded, setExpanded] = useState(false);
   const summary = useMemo(
     () => summarizeInput(bubble.toolName, bubble.input),
@@ -110,6 +137,30 @@ function ToolBubbleRow({ bubble }: { bubble: ToolUseBubble }) {
   const hiddenCount = resultLines.length - PREVIEW_LINES;
 
   const hasOutput = bubble.result !== undefined || hasDiff;
+
+  const [subagentOpen, setSubagentOpen] = useState(false);
+  const [subagentBubbles, setSubagentBubbles] = useState<Bubble[] | null>(null);
+  const [subagentLoading, setSubagentLoading] = useState(false);
+  const [subagentError, setSubagentError] = useState<string | null>(null);
+
+  async function toggleSubagent() {
+    if (subagentOpen) {
+      setSubagentOpen(false);
+      return;
+    }
+    setSubagentOpen(true);
+    if (subagentBubbles || !subagent || !sessionId) return;
+    setSubagentLoading(true);
+    setSubagentError(null);
+    try {
+      const { events } = await api.getSubagentEvents(sessionId, subagent.agentId);
+      setSubagentBubbles(eventsToBubbles(events));
+    } catch (e) {
+      setSubagentError((e as Error).message);
+    } finally {
+      setSubagentLoading(false);
+    }
+  }
 
   return (
     <div className="bubble-row bubble-row-tool">
@@ -154,6 +205,25 @@ function ToolBubbleRow({ bubble }: { bubble: ToolUseBubble }) {
                 >
                   … +{hiddenCount} lines (click to expand)
                 </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {subagent && sessionId && (
+          <div className="cli-tool-output">
+            <span className="cli-connector">└</span>
+            <div className="cli-tool-body">
+              <button type="button" className="cli-expand" onClick={toggleSubagent}>
+                {subagentOpen ? '▾' : '▸'} subagent transcript
+                {subagent.agentType ? ` — ${subagent.agentType}` : ''}
+              </button>
+              {subagentOpen && (
+                <div className="subagent-transcript">
+                  {subagentLoading && <div className="muted small">loading…</div>}
+                  {subagentError && <div className="cli-result-error small">{subagentError}</div>}
+                  {subagentBubbles?.map(b => <BubbleRow key={b.id} bubble={b} />)}
+                </div>
               )}
             </div>
           </div>

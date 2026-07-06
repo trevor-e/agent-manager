@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react';
-import type { Session, SessionEvent } from '../types';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import type { Session, SessionEvent, SubagentSummary } from '../types';
 import { type Bubble, type ToolUseBubble, BubbleRow } from './Bubble';
 import { ApprovalModal, type ResolveOpts } from './composer/approvals';
 import { type Attachment, processAttachmentFiles } from './composer/attachments';
@@ -9,10 +9,19 @@ import { useAgentStream } from '../hooks/useAgentStream';
 export function Composer({
   session,
   initialEvents,
+  subagents,
 }: {
   session: Session;
   initialEvents: SessionEvent[];
+  subagents?: SubagentSummary[];
 }) {
+  const subagentsByToolUseId = useMemo(() => {
+    const map = new Map<string, SubagentSummary>();
+    for (const s of subagents ?? []) {
+      if (s.toolUseId) map.set(s.toolUseId, s);
+    }
+    return map;
+  }, [subagents]);
   const agent = useAgentStream(session, initialEvents);
   const [draft, setDraft] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -143,7 +152,14 @@ export function Composer({
         {agent.bubbles.length === 0 && (
           <div className="muted small pad">No messages yet — say something to wake up the agent.</div>
         )}
-        {agent.bubbles.map(b => <BubbleRow key={b.id} bubble={b} />)}
+        {agent.bubbles.map(b => (
+          <BubbleRow
+            key={b.id}
+            bubble={b}
+            sessionId={session.id}
+            subagentsByToolUseId={subagentsByToolUseId}
+          />
+        ))}
         {agent.working && shouldShowThinking(agent.bubbles) && <ThinkingBubble />}
         {agent.queuedMessages.length > 0 && (
           <>

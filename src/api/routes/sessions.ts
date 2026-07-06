@@ -24,6 +24,7 @@ import {
 } from '../state.ts';
 import { computeUsage } from '../../scanner/usage.ts';
 import { computeToolUsage } from '../../scanner/tools.ts';
+import { listSubagentSummaries, readSubagentEvents } from '../../scanner/subagents.ts';
 import { isConfigured as linearConfigured, getIssue } from '../../linear.ts';
 
 type RepoSummary = {
@@ -75,8 +76,26 @@ export function registerSessionRoutes(app: FastifyInstance) {
     const events = row.jsonl_path && existsSync(row.jsonl_path)
       ? await readLastEvents(row.jsonl_path, 50)
       : [];
-    return { session: view, events };
+    const subagents = row.jsonl_path ? await listSubagentSummaries(row.jsonl_path) : [];
+    return { session: view, events, subagents };
   });
+
+  app.get<{ Params: { id: string; agentId: string } }>(
+    '/api/sessions/:id/subagents/:agentId',
+    async (req, reply) => {
+      const row = getSession(req.params.id);
+      if (!row?.jsonl_path) {
+        reply.code(404);
+        return { error: 'not found' };
+      }
+      const events = await readSubagentEvents(row.jsonl_path, req.params.agentId);
+      if (events === null) {
+        reply.code(404);
+        return { error: 'not found' };
+      }
+      return { events };
+    }
+  );
 
   app.patch<{
     Params: { id: string };

@@ -8,7 +8,7 @@ import { LaunchModal } from '../components/LaunchModal';
 import { RepoSelect } from '../components/RepoSelect';
 import { SessionSidebar, sortSidebarSessions } from '../components/SessionSidebar';
 import { computeSlots, rememberSlotNav } from '../sessionSlots';
-import type { RepoSummary, Session, SessionEvent } from '../types';
+import type { RepoSummary, Session, SessionEvent, SubagentSummary } from '../types';
 import { useNow } from '../useNow';
 import { contextPercent, formatCost, formatTokens, usageTooltip } from '../format';
 import { STATE_LABELS, ageStr } from '../constants';
@@ -21,7 +21,7 @@ function isInputFocused(): boolean {
 }
 
 export function DetailPage({ id }: { id: string }) {
-  const [data, setData] = useState<{ session: Session; events: SessionEvent[] } | null>(null);
+  const [data, setData] = useState<{ session: Session; events: SessionEvent[]; subagents: SubagentSummary[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -185,7 +185,7 @@ export function DetailPage({ id }: { id: string }) {
 
   if (err) return <div className="error pad">{err}</div>;
   if (!data || !session) return <div className="muted pad">loading…</div>;
-  const { events } = data;
+  const { events, subagents } = data;
   const ctxPct = session.usage ? contextPercent(session.usage) : null;
 
   return (
@@ -367,7 +367,7 @@ export function DetailPage({ id }: { id: string }) {
 
       <div className="detail-body">
         {view === 'conversation' ? (
-          <Composer key={session.id} session={session} initialEvents={events} />
+          <Composer key={session.id} session={session} initialEvents={events} subagents={subagents} />
         ) : (
           <GitView sessionId={session.id} />
         )}

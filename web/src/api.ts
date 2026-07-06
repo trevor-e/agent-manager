@@ -1,4 +1,4 @@
-import type { Session, RepoSummary, SessionEvent, GitChanges, LaunchOptions, LinearIssue, LinearProject, Workflow } from './types';
+import type { Session, RepoSummary, SessionEvent, GitChanges, LaunchOptions, LinearIssue, LinearProject, Workflow, SubagentSummary } from './types';
 
 async function jget<T>(url: string): Promise<T> {
   const r = await fetch(url);
@@ -27,7 +27,10 @@ export const api = {
     if (params.q) qs.set('q', params.q);
     return jget<{ sessions: Session[] }>(`/api/sessions?${qs.toString()}`);
   },
-  getSession: (id: string) => jget<{ session: Session; events: SessionEvent[] }>(`/api/sessions/${id}`),
+  getSession: (id: string) =>
+    jget<{ session: Session; events: SessionEvent[]; subagents: SubagentSummary[] }>(`/api/sessions/${id}`),
+  getSubagentEvents: (sessionId: string, agentId: string) =>
+    jget<{ events: SessionEvent[] }>(`/api/sessions/${sessionId}/subagents/${encodeURIComponent(agentId)}`),
   patchSession: (id: string, body: Partial<{ user_status: 'active' | 'done' | 'archived'; title: string | null }>) =>
     jsend<{ session: Session }>(`/api/sessions/${id}`, 'PATCH', body),
   launch: (body: {

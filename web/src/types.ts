@@ -4,6 +4,7 @@ export type {
   EffortLevel,
   LaunchOptions,
   UsageTotals,
+  SubagentSummary,
 } from '../../src/shared/types.ts';
 
 export type Session = {

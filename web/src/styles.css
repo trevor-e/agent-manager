@@ -515,6 +515,10 @@ button .kbd-hint { background: transparent; border-color: rgba(88,166,255,0.25);
   font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 }
 .cli-expand:hover { color: var(--fg2); }
+.subagent-transcript {
+  margin-top: 4px; padding: 8px 0 4px 10px;
+  border-left: 2px solid var(--gray);
+}
 
 .composer-quick-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .quick-action {
