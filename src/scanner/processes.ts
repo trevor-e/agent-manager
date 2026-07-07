@@ -9,7 +9,7 @@ const LSOF_BIN = '/usr/sbin/lsof';
 
 const ETIME_RE = /^(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)$/;
 
-function etimeToMs(etime: string): number {
+export function etimeToMs(etime: string): number {
   const m = etime.trim().match(ETIME_RE);
   if (!m) return 0;
   const [, days, hours, mins, secs] = m;
@@ -97,7 +97,7 @@ export async function scanProcesses(): Promise<ProcessRow[]> {
   return rows;
 }
 
-function isClaudeProcess(command: string): boolean {
+export function isClaudeProcess(command: string): boolean {
   const head = command.split(/\s+/, 1)[0] ?? '';
   const exe = head.split('/').pop() ?? head;
   return exe === 'claude';

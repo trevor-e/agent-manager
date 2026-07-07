@@ -74,13 +74,13 @@ async function mergeBase(cwd: string, ref: string): Promise<string | null> {
   return out ? out.trim() || null : null;
 }
 
-function isBinary(buf: Buffer): boolean {
+export function isBinary(buf: Buffer): boolean {
   const limit = Math.min(buf.length, 8000);
   for (let i = 0; i < limit; i++) if (buf[i] === 0) return true;
   return false;
 }
 
-function formatAddOnlyDiff(filePath: string, text: string): string {
+export function formatAddOnlyDiff(filePath: string, text: string): string {
   const trailing = text.endsWith('\n');
   const body = trailing ? text.slice(0, -1) : text;
   const lines = body.length === 0 ? [] : body.split('\n');
@@ -90,17 +90,19 @@ function formatAddOnlyDiff(filePath: string, text: string): string {
     `--- /dev/null\n` +
     `+++ b/${filePath}\n` +
     `@@ -0,0 +1,${lines.length} @@\n`;
-  const noNewline = !trailing && lines.length > 0 ? '\n\\ No newline at end of file\n' : '';
-  return head + lines.map((l) => '+' + l).join('\n') + (lines.length ? '\n' : '') + noNewline;
+  const content = lines.map((l) => '+' + l).join('\n');
+  if (lines.length === 0) return head;
+  if (trailing) return head + content + '\n';
+  return head + content + '\n\\ No newline at end of file\n';
 }
 
-type PorcelainEntry = {
+export type PorcelainEntry = {
   path: string;
   oldPath: string | null;
   status: FileChange['status'];
 };
 
-function parsePorcelainZ(out: string): PorcelainEntry[] {
+export function parsePorcelainZ(out: string): PorcelainEntry[] {
   const entries: PorcelainEntry[] = [];
   const parts = out.split('\0');
   let i = 0;
@@ -130,9 +132,9 @@ function parsePorcelainZ(out: string): PorcelainEntry[] {
   return entries;
 }
 
-type Numstat = { additions: number; deletions: number; binary: boolean };
+export type Numstat = { additions: number; deletions: number; binary: boolean };
 
-function parseNumstat(out: string, target: string): Numstat {
+export function parseNumstat(out: string, target: string): Numstat {
   for (const line of out.split('\n')) {
     if (!line.trim()) continue;
     const [a, d, p] = line.split('\t');
@@ -148,7 +150,7 @@ function parseNumstat(out: string, target: string): Numstat {
   return { additions: 0, deletions: 0, binary: false };
 }
 
-function clampDiff(diff: string): { diff: string; truncated: boolean } {
+export function clampDiff(diff: string): { diff: string; truncated: boolean } {
   if (diff.length > MAX_DIFF_BYTES) {
     return { diff: diff.slice(0, MAX_DIFF_BYTES), truncated: true };
   }
