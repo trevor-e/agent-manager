@@ -263,6 +263,9 @@ function normalizeLaunchOptions(input: unknown): LaunchOptions | null {
   if (typeof src.model === 'string' && src.model.trim()) {
     out.model = src.model.trim();
   }
+  if (typeof src.fallbackModel === 'string' && src.fallbackModel.trim()) {
+    out.fallbackModel = src.fallbackModel.trim();
+  }
   if (typeof src.effort === 'string' && EFFORT_LEVELS.has(src.effort)) {
     out.effort = src.effort as LaunchOptions['effort'];
   }

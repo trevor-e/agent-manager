@@ -43,7 +43,7 @@ There are two distinct execution paths and they are not interchangeable:
 
 Both paths use the same `LaunchOptions` shape stored on the session row (`launch_options` JSON column) so the resume of a forked or option-customized session re-applies the original flags.
 
-The web-chat agent sets `CLAUDE_MANAGER_AGENT=1` in the child env. On server start, `src/agent/cleanup.ts` greps `ps -axwwE` for that env var and SIGTERMs any leftover children from a prior run. Don't break that contract — it's how we avoid orphaned headless agents.
+The web-chat agent sets `CLAUDE_MANAGER_AGENT=1` and `CLAUDE_MANAGER_SERVER_PID=<server pid>` in the child env. Before listening, `src/agent/cleanup.ts` scans `ps` for the marker and SIGTERMs leftover children — but only those reparented to launchd (ppid 1, i.e. their server died). The marker is inherited by agents' own subprocesses and is visible to other server instances, so the ppid check is what keeps a second instance (another port, a test run) from killing a live server's agents. Don't break that contract — it's how we avoid orphaned headless agents.
 
 ### Server layout
 

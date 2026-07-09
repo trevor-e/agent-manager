@@ -23,6 +23,7 @@ export function appendLaunchOptionArgs(args: string[], opts: LaunchOptions | nul
   if (!opts) return;
   if (opts.permissionMode) args.push('--permission-mode', opts.permissionMode);
   if (opts.model) args.push('--model', opts.model);
+  if (opts.fallbackModel) args.push('--fallback-model', opts.fallbackModel);
   if (opts.effort) args.push('--effort', opts.effort);
   if (opts.addDirs?.length) args.push('--add-dir', ...opts.addDirs);
   if (opts.worktree?.enabled) {

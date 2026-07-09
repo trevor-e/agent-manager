@@ -21,6 +21,9 @@ export type LaunchOptions = {
   permissionMode?: PermissionMode;
   worktree?: { enabled: boolean; name?: string };
   model?: string;
+  // Comma-separated list of models to try when the primary is overloaded or
+  // unavailable (`claude --fallback-model`).
+  fallbackModel?: string;
   effort?: EffortLevel;
   addDirs?: string[];
   systemPrompt?: string;

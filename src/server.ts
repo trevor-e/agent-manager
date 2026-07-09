@@ -1,13 +1,16 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
+import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import { config } from './config.ts';
+import { isAllowedHost } from './api/hostGuard.ts';
 import { registerRoutes } from './api/routes.ts';
 import { startScanner, stopScanner } from './scanner/index.ts';
 import { agentManager } from './agent/manager.ts';
 import { killOrphanedAgents } from './agent/cleanup.ts';
 import { seedBuiltinWorkflows } from './workflows/seed.ts';
+import { resolveShellPath } from './shellPath.ts';
 import { log, logPathResolved } from './log.ts';
 
 process.on('uncaughtException', err => {
@@ -20,6 +23,14 @@ process.on('unhandledRejection', reason => {
 });
 
 const app = Fastify({ logger: false });
+
+// DNS-rebinding guard — see hostGuard.ts.
+app.addHook('onRequest', async (req, reply) => {
+  if (!isAllowedHost(req.headers.host)) {
+    log('warn', 'http', `rejected request with non-local Host header`, { host: req.headers.host });
+    reply.code(403).send({ error: 'forbidden host' });
+  }
+});
 
 app.addHook('onResponse', async (req, reply) => {
   if (!req.url.startsWith('/api/')) return;
@@ -62,10 +73,40 @@ if (existsSync(distDir)) {
   }));
 }
 
+// Web-chat agents inherit the server's environment (see agent/process.ts), so
+// ambient credentials silently change how they authenticate/bill vs. the
+// user's interactive claude. Surface that at startup rather than scrubbing —
+// a user who exports these probably means for claude to use them.
+const ambientCreds = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN'].filter(
+  k => process.env[k]
+);
+if (ambientCreds.length > 0) {
+  log('warn', 'server', `web-chat agents will inherit ${ambientCreds.join(', ')} from the server environment and may authenticate/bill differently than your terminal sessions`);
+}
+
+function probeClaudeBinary() {
+  execFile(config.claudeBin, ['--version'], { timeout: 10_000 }, (err, stdout) => {
+    if (err) {
+      log('error', 'server', `claude binary probe failed — agent launches will not work`, {
+        bin: config.claudeBin,
+        message: err.message,
+      });
+    } else {
+      log('info', 'server', `claude binary ok: ${stdout.trim()}`, { bin: config.claudeBin });
+    }
+  });
+}
+
+// Reap leftover agents from a prior run before accepting connections —
+// otherwise a reconnecting client can spawn a fresh agent mid-scan and the
+// cleanup SIGTERMs it as an "orphan".
+const killed = await killOrphanedAgents(agentManager.ownedPids());
+if (killed > 0) log('info', 'server', `cleaned up ${killed} orphaned agent(s)`);
+
 app.listen({ port: config.port, host: '127.0.0.1' }).then(async () => {
   log('info', 'server', `listening at http://localhost:${config.port}`, { logFile: logPathResolved });
-  const killed = await killOrphanedAgents();
-  if (killed > 0) log('info', 'server', `cleaned up ${killed} orphaned agent(s)`);
+  probeClaudeBinary();
+  await resolveShellPath();
   log('info', 'server', `scanning ${config.projectsDir} every ${config.scanIntervalMs}ms`);
   startScanner();
 });

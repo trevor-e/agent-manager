@@ -36,7 +36,18 @@ export function registerAgentRoutes(app: FastifyInstance) {
 
     let handle: ReturnType<typeof agentManager.attach>;
     try {
-      const listener = (ev: AgentEvent) => send(ev);
+      // On exit/error the manager entry is gone; end the stream so the
+      // browser's EventSource reconnects and the fresh attach respawns the
+      // agent (--resume). Leaving the socket open strands the client on a
+      // dead entry where every send 409s until a hard refresh.
+      const listener = (ev: AgentEvent) => {
+        send(ev);
+        if (ev.type === 'exit' || ev.type === 'error') {
+          try {
+            reply.raw.end();
+          } catch {}
+        }
+      };
       handle = agentManager.attach(
         { sessionId: session.id, cwd: session.project_path },
         listener
@@ -83,10 +94,11 @@ export function registerAgentRoutes(app: FastifyInstance) {
         reply.code(400);
         return { error: 'content or images required' };
       }
-      const proc = agentManager.get(session.id);
+      let proc = agentManager.get(session.id);
       if (!proc || !proc.isAlive()) {
-        reply.code(409);
-        return { error: 'no live agent; open the session in the dashboard first' };
+        // Agent was parked (idle timeout, restart, server bounce) — respawn
+        // it with --resume rather than bouncing the message.
+        proc = agentManager.ensure({ sessionId: session.id, cwd: session.project_path });
       }
       if (session.user_status !== 'active') setUserStatus(session.id, 'active');
       if (images.length === 0) {
@@ -166,7 +178,7 @@ export function registerAgentRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: 'no live agent' };
     }
-    proc.stop();
+    proc.stop('user');
     return { ok: true };
   });
 
@@ -195,7 +207,7 @@ export function registerAgentRoutes(app: FastifyInstance) {
 
     const proc = agentManager.get(req.params.id);
     if (proc && proc.isAlive()) {
-      proc.stop();
+      proc.stop('restart');
     }
     return { ok: true, restarted: true };
   });

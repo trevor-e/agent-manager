@@ -13,7 +13,7 @@ const RECENT_EVENT_BUFFER = 200;
 class AgentManager {
   private entries = new Map<string, Entry>();
 
-  attach(opts: { sessionId: string; cwd: string }, listener: (ev: AgentEvent) => void) {
+  private ensureEntry(opts: { sessionId: string; cwd: string }): Entry {
     let entry = this.entries.get(opts.sessionId);
     if (!entry) {
       const process = new AgentProcess({ sessionId: opts.sessionId, cwd: opts.cwd });
@@ -35,6 +35,20 @@ class AgentManager {
       });
       process.start();
     }
+    return entry;
+  }
+
+  // Spawn (or return the live) agent for a session without attaching a
+  // listener — lets the message endpoint respawn a parked agent on demand
+  // instead of 409ing. With no listeners the normal idle timeout applies.
+  ensure(opts: { sessionId: string; cwd: string }): AgentProcess {
+    const entry = this.ensureEntry(opts);
+    if (entry.listeners.size === 0) this.scheduleIdleTimeout(opts.sessionId, entry);
+    return entry.process;
+  }
+
+  attach(opts: { sessionId: string; cwd: string }, listener: (ev: AgentEvent) => void) {
+    const entry = this.ensureEntry(opts);
     if (entry.idleTimer) {
       clearTimeout(entry.idleTimer);
       entry.idleTimer = null;
@@ -70,9 +84,15 @@ class AgentManager {
     }
     entry.idleTimer = setTimeout(() => {
       const e = this.entries.get(sessionId);
-      if (e && e.listeners.size === 0) {
-        e.process.stop();
+      if (!e || e.listeners.size !== 0) return;
+      e.idleTimer = null;
+      if (e.process.status !== 'awaiting_input') {
+        // A turn started after the timer was set (e.g. a message sent with no
+        // stream attached) — wait for it to finish, then restart the clock.
+        this.scheduleIdleTimeout(sessionId, e);
+        return;
       }
+      e.process.stop('idle');
     }, config.agentIdleTimeoutMs);
     entry.idleTimer.unref?.();
   }
@@ -110,7 +130,7 @@ class AgentManager {
 
   stopAll() {
     for (const entry of this.entries.values()) {
-      entry.process.stop();
+      entry.process.stop('shutdown');
     }
     this.entries.clear();
   }

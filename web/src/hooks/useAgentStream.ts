@@ -18,7 +18,12 @@ type AgentEvent =
   | { type: 'approval_request'; approvalId: string; toolName: string; input: any }
   | { type: 'approval_resolved'; approvalId: string; decision: 'approve' | 'deny'; reason?: string }
   | { type: 'stderr'; line: string }
-  | { type: 'exit'; code: number | null; signal: string | null }
+  | {
+      type: 'exit';
+      code: number | null;
+      signal: string | null;
+      reason?: 'idle' | 'restart' | 'shutdown' | 'user';
+    }
   | { type: 'error'; message: string };
 
 export function useAgentStream(session: Session, initialEvents: SessionEvent[]) {
@@ -102,8 +107,22 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
     const url = `/api/sessions/${session.id}/stream`;
     const es = new EventSource(url);
     esRef.current = es;
-    es.onopen = () => setConnected(true);
-    es.onerror = () => setConnected(false);
+    es.onopen = () => {
+      reconnectRef.current = 0;
+      setConnected(true);
+    };
+    es.onerror = () => {
+      setConnected(false);
+      // EventSource retries dropped connections itself, but gives up for good
+      // on e.g. connection-refused (server restarting). Retry those with
+      // backoff instead of stranding the page until a hard refresh.
+      if (es.readyState === EventSource.CLOSED && esRef.current === es) {
+        const delay = Math.min(15_000, 1_000 * 2 ** Math.min(reconnectRef.current, 4));
+        setTimeout(() => {
+          if (esRef.current === es) reconnectSSE();
+        }, delay);
+      }
+    };
     es.onmessage = e => {
       let ev: AgentEvent;
       try {
@@ -220,9 +239,16 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
         if (ev.line) addBubble({ kind: 'system', text: `[stderr] ${ev.line}` } as Bubble);
         break;
       case 'exit': {
-        const text =
-          ev.signal === 'SIGTERM' || ev.code === 143
-            ? 'agent stopped (idle timeout)'
+        // Deliberate stops reconnect automatically: the server ends the SSE
+        // stream after an exit, EventSource re-opens it, and the fresh attach
+        // respawns the agent with --resume. Only bother the user for stops
+        // they asked for or genuine crashes.
+        const deliberate =
+          ev.reason === 'idle' || ev.reason === 'restart' || ev.reason === 'shutdown';
+        const text = deliberate
+          ? 'agent paused — reconnecting…'
+          : ev.reason === 'user'
+            ? 'agent stopped'
             : `agent exited (code=${ev.code ?? '?'})`;
         addBubble({ kind: 'system', text } as Bubble);
         setConnected(false);
@@ -230,7 +256,7 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
         streamingMessageIdRef.current = null;
         queueRef.current = [];
         setQueuedMessages([]);
-        notify(`Session finished`, session.display_name ?? 'Session');
+        if (!deliberate) notify(`Session finished`, session.display_name ?? 'Session');
         break;
       }
       case 'error':

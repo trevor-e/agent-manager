@@ -51,6 +51,7 @@ export function LaunchModal({
   const [worktreeEnabled, setWorktreeEnabled] = useState(false);
   const [worktreeName, setWorktreeName] = useState('');
   const [model, setModel] = useState('claude-sonnet-5');
+  const [fallbackModel, setFallbackModel] = useState('');
   const [effort, setEffort] = useState<EffortLevel | ''>('');
   const [addDirsText, setAddDirsText] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
@@ -83,6 +84,7 @@ export function LaunchModal({
       if (worktreeName.trim()) opts.worktree.name = worktreeName.trim();
     }
     if (model.trim()) opts.model = model.trim();
+    if (fallbackModel && fallbackModel !== model) opts.fallbackModel = fallbackModel;
     if (effort) opts.effort = effort;
     const dirs = addDirsText
       .split(/[\n,]/)
@@ -234,6 +236,15 @@ export function LaunchModal({
         <details className="modal-more">
           <summary>More options</summary>
           <div className="modal-more-body">
+            <div className="modal-field">
+              <label>Fallback model (when primary is overloaded)</label>
+              <select value={fallbackModel} onChange={e => setFallbackModel(e.target.value)}>
+                <option value="">None</option>
+                {MODELS.filter(m => m.value !== model).map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
             <div className="modal-field">
               <label>System prompt (replaces default)</label>
               <textarea

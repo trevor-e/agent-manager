@@ -1,10 +1,12 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
+import { join } from 'node:path';
 import { config } from '../config.ts';
 import { db, getSession, getWorkflow } from '../db.ts';
 import { log } from '../log.ts';
+import { shellPath } from '../shellPath.ts';
 import type { LaunchOptions } from '../shared/types.ts';
 import { buildSessionArgs, appendLaunchOptionArgs } from '../launcher/args.ts';
 import { renderWorkflow } from '../workflows/render.ts';
@@ -29,6 +31,19 @@ function parseLaunchOptions(raw: string | null | undefined): LaunchOptions | nul
 
 const APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
 
+// Where the claude CLI will have written this session's transcript: project
+// key is the realpath'd cwd with non-alphanumerics replaced by '-'.
+function expectedJsonlPath(cwd: string, sessionId: string): string {
+  let real = cwd;
+  try {
+    real = realpathSync(cwd);
+  } catch {
+    // keep the un-resolved path
+  }
+  const key = real.replace(/[^a-zA-Z0-9]/g, '-');
+  return join(config.projectsDir, key, `${sessionId}.jsonl`);
+}
+
 type PendingApproval = {
   approvalId: string;
   toolName: string;
@@ -41,12 +56,16 @@ type PendingApproval = {
 
 export type AgentStatus = 'working' | 'awaiting_input' | 'awaiting_approval';
 
+// Why the agent was deliberately stopped. Absent on the exit event when the
+// child died on its own (crash, self-exit) — the UI labels those by exit code.
+export type StopReason = 'idle' | 'restart' | 'shutdown' | 'user';
+
 export type AgentEvent =
   | { type: 'output'; line: string; parsed: IncomingMessage | null }
   | { type: 'approval_request'; approvalId: string; toolName: string; input: unknown }
   | { type: 'approval_resolved'; approvalId: string; decision: 'approve' | 'deny'; reason?: string }
   | { type: 'stderr'; line: string }
-  | { type: 'exit'; code: number | null; signal: NodeJS.Signals | null }
+  | { type: 'exit'; code: number | null; signal: NodeJS.Signals | null; reason?: StopReason }
   | { type: 'error'; message: string };
 
 export class AgentProcess extends EventEmitter {
@@ -58,6 +77,7 @@ export class AgentProcess extends EventEmitter {
   private stderrBuffer = '';
   private pendingApprovals = new Map<string, PendingApproval>();
   private exited = false;
+  private stopReason: StopReason | undefined;
   private turnStatus: 'working' | 'awaiting_input' = 'awaiting_input';
 
   constructor(opts: { sessionId: string; cwd: string }) {
@@ -87,12 +107,16 @@ export class AgentProcess extends EventEmitter {
 
     // If the session has never been written to disk (placeholder row), use
     // --session-id to create a fresh session with that UUID. Otherwise --resume.
+    // The DB alone isn't enough: the scanner indexes JSONLs on a tick, so a
+    // respawn can beat it. Check the expected on-disk path too — reusing
+    // --session-id for an id that already has a transcript makes the CLI exit 1.
     const existing = db
       .prepare('SELECT jsonl_path, launch_options FROM sessions WHERE id = ?')
       .get(this.sessionId) as
       | { jsonl_path: string | null; launch_options: string | null }
       | undefined;
-    const isNew = !existing?.jsonl_path;
+    const isNew =
+      !existing?.jsonl_path && !existsSync(expectedJsonlPath(this.cwd, this.sessionId));
     const launchOptions = parseLaunchOptions(existing?.launch_options);
 
     const args = [
@@ -118,7 +142,20 @@ export class AgentProcess extends EventEmitter {
     this.child = spawn(config.claudeBin, args, {
       cwd: this.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, NPM_CONFIG_LOGLEVEL: 'error', CLAUDE_MANAGER_AGENT: '1' },
+      // Full env inheritance is deliberate: the child authenticates as the
+      // user, including any ambient ANTHROPIC_API_KEY / CLAUDE_CODE_OAUTH_TOKEN
+      // (server startup logs a warning when those are set). PATH comes from the
+      // login shell so Bash tool subprocesses find git/gh/node even if the
+      // server itself was launched outside a terminal.
+      env: {
+        ...process.env,
+        PATH: shellPath(),
+        NPM_CONFIG_LOGLEVEL: 'error',
+        CLAUDE_MANAGER_AGENT: '1',
+        // Ownership attribution for `ps` debugging; orphan detection itself
+        // uses ppid (see agent/cleanup.ts).
+        CLAUDE_MANAGER_SERVER_PID: String(process.pid),
+      },
     });
 
     this.child.stdout!.setEncoding('utf8');
@@ -275,11 +312,14 @@ export class AgentProcess extends EventEmitter {
       // Emit raw and move on.
     }
 
-    this.emit('event', { type: 'output', line, parsed } as AgentEvent);
-
+    // Update turn state before emitting: listeners (e.g. the manager's idle
+    // scheduling) read `status` synchronously while handling the event, and
+    // must see the state the event implies, not the one it replaces.
     if (parsed?.type === 'result') {
       this.turnStatus = 'awaiting_input';
     }
+
+    this.emit('event', { type: 'output', line, parsed } as AgentEvent);
 
     if (!parsed || parsed.type !== 'control_request') return;
     const req = parsed.request as { subtype: string; [k: string]: unknown };
@@ -334,7 +374,7 @@ export class AgentProcess extends EventEmitter {
 
   private onExit(code: number | null, signal: NodeJS.Signals | null) {
     this.exited = true;
-    log('info', `agent:${this.sessionId}`, 'exited', { code, signal });
+    log('info', `agent:${this.sessionId}`, 'exited', { code, signal, reason: this.stopReason });
     for (const pending of this.pendingApprovals.values()) {
       pending.resolve({
         behavior: 'deny',
@@ -343,11 +383,12 @@ export class AgentProcess extends EventEmitter {
       });
     }
     this.pendingApprovals.clear();
-    this.emit('event', { type: 'exit', code, signal } as AgentEvent);
+    this.emit('event', { type: 'exit', code, signal, reason: this.stopReason } as AgentEvent);
   }
 
-  stop(signal: NodeJS.Signals = 'SIGTERM') {
+  stop(reason: StopReason = 'user', signal: NodeJS.Signals = 'SIGTERM') {
     if (this.child && !this.exited) {
+      this.stopReason = reason;
       try {
         this.child.kill(signal);
       } catch {
