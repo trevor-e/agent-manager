@@ -155,16 +155,25 @@ export function useAgentStream(session: Session, initialEvents: SessionEvent[]) 
         if (!p || typeof p !== 'object') return;
         if (p.type === 'result') {
           streamingMessageIdRef.current = null;
-          const next = queueRef.current[0];
-          if (next) {
-            queueRef.current = queueRef.current.slice(1);
-            setQueuedMessages([...queueRef.current]);
-            setBubbles(prev => [...prev, {
-              kind: 'user' as const,
-              id: next.id,
-              text: next.text,
-              ...(next.images?.length ? { images: next.images } : {}),
-            }]);
+          const queued = queueRef.current;
+          if (queued.length) {
+            // The CLI merges any messages queued while it was still working
+            // into a single next turn (their text joined with '\n'), so it
+            // emits exactly one 'result' for the whole batch — not one per
+            // queued message. Flush the entire queue here rather than just
+            // its head, or later entries would never be promoted out of
+            // "queued" once the CLI answers them together.
+            queueRef.current = [];
+            setQueuedMessages([]);
+            setBubbles(prev => [
+              ...prev,
+              ...queued.map(next => ({
+                kind: 'user' as const,
+                id: next.id,
+                text: next.text,
+                ...(next.images?.length ? { images: next.images } : {}),
+              })),
+            ]);
           } else {
             setWorking(false);
           }
