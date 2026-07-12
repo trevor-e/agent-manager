@@ -108,6 +108,8 @@ type AskUserQuestionInput = {
   }>;
 };
 
+const OTHER = '__ask_user_question_other__';
+
 function AskUserQuestionModal({
   approval,
   onResolve,
@@ -122,29 +124,38 @@ function AskUserQuestionModal({
     for (const q of questions) init[q.question] = [];
     return init;
   });
+  const [otherText, setOtherText] = useState<Record<string, string>>({});
 
-  function toggle(q: { question: string; multiSelect?: boolean }, label: string) {
+  function toggle(q: { question: string; multiSelect?: boolean }, value: string) {
     setSelections(prev => {
       const cur = prev[q.question] ?? [];
       if (q.multiSelect) {
         return {
           ...prev,
-          [q.question]: cur.includes(label) ? cur.filter(l => l !== label) : [...cur, label],
+          [q.question]: cur.includes(value) ? cur.filter(l => l !== value) : [...cur, value],
         };
       }
-      return { ...prev, [q.question]: [label] };
+      return { ...prev, [q.question]: cur.includes(value) ? [] : [value] };
     });
   }
 
   function submit() {
     const answers: Record<string, string> = {};
     for (const q of questions) {
-      answers[q.question] = (selections[q.question] ?? []).join(', ');
+      const chosen = (selections[q.question] ?? []).map(v =>
+        v === OTHER ? (otherText[q.question] ?? '').trim() : v
+      );
+      answers[q.question] = chosen.join(', ');
     }
     onResolve('approve', { updatedInput: { ...input, answers } });
   }
 
-  const allAnswered = questions.every(q => (selections[q.question] ?? []).length > 0);
+  const allAnswered = questions.every(q => {
+    const chosen = selections[q.question] ?? [];
+    if (chosen.length === 0) return false;
+    if (chosen.includes(OTHER) && !(otherText[q.question] ?? '').trim()) return false;
+    return true;
+  });
 
   return (
     <div className="modal-bg">
@@ -172,6 +183,32 @@ function AskUserQuestionModal({
                   </button>
                 );
               })}
+              {(() => {
+                const otherSelected = (selections[q.question] ?? []).includes(OTHER);
+                return (
+                  <div className={'question-option ' + (otherSelected ? 'question-option-selected' : '')}>
+                    <button
+                      type="button"
+                      className="question-option-toggle"
+                      onKeyDown={enterOnly}
+                      onClick={() => toggle(q, OTHER)}
+                    >
+                      <div className="question-option-label">Other</div>
+                    </button>
+                    {otherSelected && (
+                      <input
+                        type="text"
+                        className="question-other-input"
+                        autoFocus
+                        placeholder="Type your answer"
+                        value={otherText[q.question] ?? ''}
+                        onKeyDown={e => e.stopPropagation()}
+                        onChange={e => setOtherText(prev => ({ ...prev, [q.question]: e.target.value }))}
+                      />
+                    )}
+                  </div>
+                );
+              })()}
             </div>
             {q.multiSelect && (
               <div className="muted small">multi-select — choose any</div>

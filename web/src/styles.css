@@ -639,6 +639,11 @@ button .kbd-hint { background: transparent; border-color: rgba(88,166,255,0.25);
 }
 .question-option-label { font-size: 13px; font-weight: 500; }
 .question-option-desc { margin-top: 2px; }
+.question-option-toggle {
+  background: none; border: none; padding: 0; margin: 0; cursor: pointer;
+  color: inherit; font: inherit; text-align: left; display: block; width: 100%;
+}
+.question-other-input { width: 100%; margin-top: 8px; }
 
 /* ---- Markdown ---- */
 /* Scoped: the parent bubble may have white-space: pre-wrap, but markdown
